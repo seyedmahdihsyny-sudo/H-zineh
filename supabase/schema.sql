@@ -20,7 +20,9 @@ revoke update on public.profiles from authenticated;
 grant update (display_name) on public.profiles to authenticated;
 grant select on public.profiles to authenticated;
 create policy categories_read on public.expense_categories for select to authenticated using (true);
-create policy categories_admin_manage on public.expense_categories for all to authenticated using (exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'admin')) with check (exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'admin'));
+create policy categories_admin_insert on public.expense_categories for insert to authenticated with check (exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'admin'));
+create policy categories_admin_update on public.expense_categories for update to authenticated using (exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'admin')) with check (exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'admin'));
+create policy categories_admin_delete on public.expense_categories for delete to authenticated using (exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'admin'));
 create policy expenses_read_authenticated on public.expenses for select to authenticated using (true);
 create policy expenses_insert_self on public.expenses for insert to authenticated with check (created_by = (select auth.uid()) and partner_id = (select auth.uid()));
 create policy expenses_update_owner on public.expenses for update to authenticated using (created_by = (select auth.uid())) with check (created_by = (select auth.uid()) and partner_id = (select auth.uid()));
@@ -36,6 +38,12 @@ grant select on public.expense_categories, public.expenses, public.expense_histo
 grant insert, update, delete on public.expenses to authenticated;
 grant insert, delete on public.notification_reads to authenticated;
 grant usage, select on all sequences in schema public to authenticated;
+create index if not exists expenses_category_id_idx on public.expenses(category_id);
+create index if not exists expenses_created_by_idx on public.expenses(created_by);
+create index if not exists expenses_partner_id_idx on public.expenses(partner_id);
+create index if not exists expenses_expense_date_idx on public.expenses(expense_date desc);
+create index if not exists expense_history_actor_id_idx on public.expense_history(actor_id);
+create index if not exists notification_reads_user_id_idx on public.notification_reads(user_id);
 create or replace function private.handle_new_user() returns trigger language plpgsql security definer set search_path = '' as $$
 begin insert into public.profiles (id, display_name) values (new.id, coalesce(new.raw_user_meta_data ->> 'display_name', '')); return new; end; $$;
 drop trigger if exists on_auth_user_created_profile on auth.users;
