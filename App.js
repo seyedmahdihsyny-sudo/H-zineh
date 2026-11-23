@@ -38,6 +38,7 @@ export default function App() {
   const [profiles, setProfiles] = useState([]);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [displayNameEdit, setDisplayNameEdit] = useState('');
+  const [passwordEdit, setPasswordEdit] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [tab, setTab] = useState('home');
   const [showForm, setShowForm] = useState(false);
@@ -151,12 +152,12 @@ export default function App() {
   }
 
   async function changePassword() {
-    if (password.length < 8) return Alert.alert('رمز نامعتبر', 'رمز جدید حداقل ۸ کاراکتر باشد.');
+    if (passwordEdit.length < 8) return Alert.alert('رمز نامعتبر', 'رمز جدید حداقل ۸ کاراکتر باشد.');
     setBusy(true);
-    const result = await supabase.auth.updateUser({ password });
+    const result = await supabase.auth.updateUser({ password: passwordEdit });
     setBusy(false);
     if (result.error) return Alert.alert('خطا', result.error.message);
-    setPassword('');
+    setPasswordEdit('');
     Alert.alert('انجام شد', 'رمز عبور تغییر کرد.');
   }
 
@@ -284,7 +285,7 @@ export default function App() {
           <TextInput style={s.input} placeholder="نام شما" value={displayNameEdit} onChangeText={setDisplayNameEdit} />
           <Pressable style={s.primary} onPress={saveProfileSettings} disabled={busy}><Text style={s.primaryText}>ذخیره نام</Text></Pressable>
           <Text style={s.fieldLabel}>تغییر رمز عبور</Text>
-          <TextInput style={s.input} placeholder="رمز جدید (حداقل ۸ کاراکتر)" secureTextEntry value={password} onChangeText={setPassword} />
+          <TextInput style={s.input} placeholder="رمز جدید (حداقل ۸ کاراکتر)" secureTextEntry value={passwordEdit} onChangeText={setPasswordEdit} />
           <Pressable style={s.secondary} onPress={changePassword} disabled={busy}><Text style={s.secondaryText}>تغییر رمز عبور</Text></Pressable>
           <Pressable style={s.cancel} onPress={() => supabase.auth.signOut()}><Text style={s.danger}>خروج از حساب</Text></Pressable>
         </ScrollView>
