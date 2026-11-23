@@ -39,7 +39,7 @@ export default function App() {
   const [previewVisible, setPreviewVisible] = useState(false);
   const [displayNameEdit, setDisplayNameEdit] = useState('');
   const [newCategory, setNewCategory] = useState('');
-  const [tab, setTab] = useState('expenses');
+  const [tab, setTab] = useState('home');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [title, setTitle] = useState('');
@@ -169,7 +169,7 @@ export default function App() {
     let invoicePath = editing?.invoice_path || null;
     if (invoice) {
       const extension = (invoice.fileName || invoice.uri.split('.').pop() || 'jpg').split('.').pop().toLowerCase();
-      const path = session.user.id + '/' + Date.now() + '.' + (['jpg','jpeg','png','webp'].includes(extension) ? extension : 'jpg');
+      const path = session.user.id + '/' + Date.now() + '.' + (['jpg','jpeg','png','webp','heic','heif'].includes(extension) ? extension : 'jpg');
       try {
         const response = await fetch(invoice.uri);
         if (!response.ok) throw new Error('خواندن تصویر انتخاب‌شده ناموفق بود.');
@@ -252,12 +252,32 @@ export default function App() {
         <Pressable onPress={() => supabase.auth.signOut()}><Text style={s.link}>خروج</Text></Pressable>
       </View>
       <View style={s.tabs}>
+        <Pressable onPress={() => { setTab('home'); setShowForm(false); }} style={[s.tab, tab === 'home' && s.activeTab]}><Text style={[s.tabText, tab === 'home' && s.activeTabText]}>منوی اصلی</Text></Pressable>
         <Pressable onPress={() => { setTab('expenses'); setShowForm(false); }} style={[s.tab, tab === 'expenses' && s.activeTab]}><Text style={[s.tabText, tab === 'expenses' && s.activeTabText]}>هزینه‌ها</Text></Pressable>
         <Pressable onPress={() => { setTab('notifications'); setShowForm(false); }} style={[s.tab, tab === 'notifications' && s.activeTab]}><Text style={[s.tabText, tab === 'notifications' && s.activeTabText]}>اعلان‌ها</Text></Pressable>
         <Pressable onPress={() => { setTab('settings'); setShowForm(false); }} style={[s.tab, tab === 'settings' && s.activeTab]}><Text style={[s.tabText, tab === 'settings' && s.activeTabText]}>تنظیمات کاربر</Text></Pressable>
         {profile?.role === 'admin' && <Pressable onPress={() => { setTab('admin'); setShowForm(false); }} style={[s.tab, tab === 'admin' && s.activeTab]}><Text style={[s.tabText, tab === 'admin' && s.activeTabText]}>تنظیمات مدیر</Text></Pressable>}
       </View>
-      {tab === 'settings' ? (
+      {tab === 'home' ? (
+        <ScrollView contentContainerStyle={s.form}>
+          <Text style={s.sectionTitle}>منوی اصلی</Text>
+          <Pressable style={s.menuCard} onPress={() => { setTab('expenses'); setShowForm(false); }}>
+            <Text style={s.menuTitle}>هزینه‌ها</Text><Text style={s.muted}>مشاهده، جست‌وجو و مدیریت هزینه‌های ثبت‌شده</Text>
+          </Pressable>
+          <Pressable style={s.menuCard} onPress={() => { setTab('expenses'); resetForm(); setShowForm(true); }}>
+            <Text style={s.menuTitle}>ثبت هزینه جدید</Text><Text style={s.muted}>ثبت مبلغ، دسته‌بندی، تاریخ و تصویر فاکتور</Text>
+          </Pressable>
+          <Pressable style={s.menuCard} onPress={() => setTab('notifications')}>
+            <Text style={s.menuTitle}>اعلان‌ها</Text><Text style={s.muted}>مشاهده اطلاع‌رسانی‌های برنامه</Text>
+          </Pressable>
+          <Pressable style={s.menuCard} onPress={() => setTab('settings')}>
+            <Text style={s.menuTitle}>تنظیمات کاربر</Text><Text style={s.muted}>تغییر نام نمایشی و رمز عبور</Text>
+          </Pressable>
+          {profile?.role === 'admin' && <Pressable style={s.menuCard} onPress={() => setTab('admin')}>
+            <Text style={s.menuTitle}>تنظیمات مدیر</Text><Text style={s.muted}>ساخت کاربران و مدیریت دسته‌بندی هزینه‌ها</Text>
+          </Pressable>}
+        </ScrollView>
+      ) : tab === 'settings' ? (
         <ScrollView contentContainerStyle={s.form}>
           <Text style={s.sectionTitle}>تنظیمات کاربری</Text>
           <Text style={s.fieldLabel}>نام نمایشی</Text>
@@ -349,6 +369,8 @@ const s = StyleSheet.create({
   activeTabText: { color: '#126b58' },
   listHeading: { paddingHorizontal: 18, paddingVertical: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#1c3029', textAlign: 'right' },
+  menuCard: { backgroundColor: '#fff', borderRadius: 15, padding: 18, marginTop: 12, borderWidth: 1, borderColor: '#e3ebe6' },
+  menuTitle: { color: '#167d65', fontSize: 16, fontWeight: '900', textAlign: 'right' },
   addButton: { backgroundColor: '#167d65', borderRadius: 10, paddingHorizontal: 13, paddingVertical: 10 },
   addText: { color: '#fff', fontWeight: '800' },
   list: { paddingHorizontal: 16, paddingBottom: 28 },
