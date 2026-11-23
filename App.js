@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView,
   Platform, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet,
-  Text, TextInput, View
+  Text, TextInput, View, Modal
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,7 +18,9 @@ const supabase = supabaseUrl && supabaseKey
   : null;
 
 const money = value => new Intl.NumberFormat('fa-IR').format(Number(value || 0)) + ' تومان';
-const dateText = value => new Date(value + 'T00:00:00').toLocaleDateString('fa-IR');
+const tehranDateInput = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+const dateText = value => new Date(value + 'T12:00:00+03:30').toLocaleDateString('fa-IR', { timeZone: 'Asia/Tehran' });
+const dateTimeText = value => new Date(value).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran', dateStyle: 'medium', timeStyle: 'short' });
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -33,12 +35,16 @@ export default function App() {
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [profiles, setProfiles] = useState([]);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [displayNameEdit, setDisplayNameEdit] = useState('');
+  const [newCategory, setNewCategory] = useState('');
   const [tab, setTab] = useState('expenses');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
-  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().slice(0, 10));
+  const [expenseDate, setExpenseDate] = useState(tehranDateInput());
   const [categoryId, setCategoryId] = useState('');
   const [description, setDescription] = useState('');
   const [invoice, setInvoice] = useState(null);
@@ -68,17 +74,19 @@ export default function App() {
   }, [session?.user?.id]);
 
   async function loadData() {
-    const [expenseResult, categoryResult, notificationResult, profileResult] = await Promise.all([
+    const [expenseResult, categoryResult, notificationResult, profileResult, profilesResult] = await Promise.all([
       supabase.from('expenses').select('*, expense_categories(name)').order('expense_date', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('expense_categories').select('*').order('name'),
       supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(40),
-      supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
+      supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle(),
+      supabase.from('profiles').select('id,display_name,role')
     ]);
     if (expenseResult.error) Alert.alert('خطا', expenseResult.error.message);
     else setExpenses(expenseResult.data || []);
     if (!categoryResult.error) setCategories(categoryResult.data || []);
     if (!notificationResult.error) setNotifications(notificationResult.data || []);
-    if (!profileResult.error) setProfile(profileResult.data || null);
+    if (!profileResult.error) { setProfile(profileResult.data || null); setDisplayNameEdit(profileResult.data?.display_name || ''); }
+    if (!profilesResult.error) setProfiles(profilesResult.data || []);
   }
 
   async function authenticate() {
@@ -106,7 +114,7 @@ export default function App() {
   }
 
   function resetForm() {
-    setTitle(''); setAmount(''); setExpenseDate(new Date().toISOString().slice(0, 10));
+    setTitle(''); setAmount(''); setExpenseDate(tehranDateInput());
     setCategoryId(''); setDescription(''); setInvoice(null); setInvoiceUrl(null);
     setEditing(null); setShowForm(false);
   }
@@ -122,6 +130,36 @@ export default function App() {
     if (!result.canceled) setInvoice(result.assets[0]);
   }
 
+  async function createCategory() {
+    const name = newCategory.trim();
+    if (!name) return;
+    setBusy(true);
+    const result = await supabase.from('expense_categories').insert({ name }).select().single();
+    setBusy(false);
+    if (result.error) return Alert.alert('خطا', result.error.message);
+    setCategories(current => [...current, result.data]);
+    setNewCategory('');
+  }
+
+  async function saveProfileSettings() {
+    setBusy(true);
+    const result = await supabase.from('profiles').update({ display_name: displayNameEdit.trim() }).eq('id', session.user.id);
+    setBusy(false);
+    if (result.error) return Alert.alert('خطا', result.error.message);
+    setProfile(current => ({ ...current, display_name: displayNameEdit.trim() }));
+    Alert.alert('ذخیره شد', 'نام نمایشی به‌روزرسانی شد.');
+  }
+
+  async function changePassword() {
+    if (password.length < 8) return Alert.alert('رمز نامعتبر', 'رمز جدید حداقل ۸ کاراکتر باشد.');
+    setBusy(true);
+    const result = await supabase.auth.updateUser({ password });
+    setBusy(false);
+    if (result.error) return Alert.alert('خطا', result.error.message);
+    setPassword('');
+    Alert.alert('انجام شد', 'رمز عبور تغییر کرد.');
+  }
+
   async function saveExpense() {
     const numericAmount = Number(amount.replace(/[,،٬\s]/g, ''));
     if (!title.trim() || !Number.isFinite(numericAmount) || numericAmount <= 0) {
@@ -132,11 +170,18 @@ export default function App() {
     if (invoice) {
       const extension = (invoice.fileName || invoice.uri.split('.').pop() || 'jpg').split('.').pop().toLowerCase();
       const path = session.user.id + '/' + Date.now() + '.' + (['jpg','jpeg','png','webp'].includes(extension) ? extension : 'jpg');
-      const response = await fetch(invoice.uri);
-      const blob = await response.blob();
-      const contentType = invoice.mimeType || 'image/jpeg';
-      const upload = await supabase.storage.from('invoices').upload(path, blob, { contentType, upsert: false });
-      if (upload.error) { setBusy(false); return Alert.alert('خطای فاکتور', upload.error.message); }
+      try {
+        const response = await fetch(invoice.uri);
+        if (!response.ok) throw new Error('خواندن تصویر انتخاب‌شده ناموفق بود.');
+        const arrayBuffer = await response.arrayBuffer();
+        const detectedType = invoice.mimeType || (extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : extension === 'heic' || extension === 'heif' ? 'image/heic' : 'image/jpeg');
+        const contentType = ['image/jpeg','image/png','image/webp','image/heic','image/heif'].includes(detectedType) ? detectedType : 'image/jpeg';
+        const upload = await supabase.storage.from('invoices').upload(path, arrayBuffer, { contentType, upsert: false });
+        if (upload.error) { setBusy(false); return Alert.alert('خطای فاکتور', upload.error.message + (upload.error.name ? '\n' + upload.error.name : '')); }
+      } catch (error) {
+        setBusy(false);
+        return Alert.alert('خطای فاکتور', error?.message || 'بارگذاری تصویر انجام نشد.');
+      }
       invoicePath = path;
     }
     const payload = {
@@ -182,7 +227,6 @@ export default function App() {
     if (result.error) Alert.alert('خطا', result.error.message);
   }
 
-  const total = useMemo(() => expenses.reduce((sum, item) => sum + Number(item.amount), 0), [expenses]);
 
   if (!supabase) return <SafeAreaView style={s.center}><Text style={s.heading}>تنظیم اتصال ناقص است</Text><Text style={s.muted}>مقادیر EXPO_PUBLIC_SUPABASE_URL و EXPO_PUBLIC_SUPABASE_ANON_KEY را در فایل .env قرار دهید.</Text></SafeAreaView>;
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color="#167d65" /></View>;
@@ -207,19 +251,36 @@ export default function App() {
         <View><Text style={s.brandSmall}>H-zineh</Text><Text style={s.muted}>مدیریت هزینه‌های کارخانه</Text></View>
         <Pressable onPress={() => supabase.auth.signOut()}><Text style={s.link}>خروج</Text></Pressable>
       </View>
-      <View style={s.summary}><Text style={s.summaryLabel}>جمع هزینه‌های ثبت‌شده</Text><Text style={s.summaryValue}>{money(total)}</Text><Text style={s.summarySub}>{expenses.length} هزینه</Text></View>
       <View style={s.tabs}>
         <Pressable onPress={() => { setTab('expenses'); setShowForm(false); }} style={[s.tab, tab === 'expenses' && s.activeTab]}><Text style={[s.tabText, tab === 'expenses' && s.activeTabText]}>هزینه‌ها</Text></Pressable>
         <Pressable onPress={() => { setTab('notifications'); setShowForm(false); }} style={[s.tab, tab === 'notifications' && s.activeTab]}><Text style={[s.tabText, tab === 'notifications' && s.activeTabText]}>اعلان‌ها</Text></Pressable>
-        {profile?.role === 'admin' && <Pressable onPress={() => { setTab('admin'); setShowForm(false); }} style={[s.tab, tab === 'admin' && s.activeTab]}><Text style={[s.tabText, tab === 'admin' && s.activeTabText]}>مدیریت کاربران</Text></Pressable>}
+        <Pressable onPress={() => { setTab('settings'); setShowForm(false); }} style={[s.tab, tab === 'settings' && s.activeTab]}><Text style={[s.tabText, tab === 'settings' && s.activeTabText]}>تنظیمات کاربر</Text></Pressable>
+        {profile?.role === 'admin' && <Pressable onPress={() => { setTab('admin'); setShowForm(false); }} style={[s.tab, tab === 'admin' && s.activeTab]}><Text style={[s.tabText, tab === 'admin' && s.activeTabText]}>تنظیمات مدیر</Text></Pressable>}
       </View>
-      {tab === 'admin' && profile?.role === 'admin' ? (
+      {tab === 'settings' ? (
         <ScrollView contentContainerStyle={s.form}>
-          <Text style={s.sectionTitle}>ساخت حساب کاربری جدید</Text>
+          <Text style={s.sectionTitle}>تنظیمات کاربری</Text>
+          <Text style={s.fieldLabel}>نام نمایشی</Text>
+          <TextInput style={s.input} placeholder="نام شما" value={displayNameEdit} onChangeText={setDisplayNameEdit} />
+          <Pressable style={s.primary} onPress={saveProfileSettings} disabled={busy}><Text style={s.primaryText}>ذخیره نام</Text></Pressable>
+          <Text style={s.fieldLabel}>تغییر رمز عبور</Text>
+          <TextInput style={s.input} placeholder="رمز جدید (حداقل ۸ کاراکتر)" secureTextEntry value={password} onChangeText={setPassword} />
+          <Pressable style={s.secondary} onPress={changePassword} disabled={busy}><Text style={s.secondaryText}>تغییر رمز عبور</Text></Pressable>
+          <Pressable style={s.cancel} onPress={() => supabase.auth.signOut()}><Text style={s.danger}>خروج از حساب</Text></Pressable>
+        </ScrollView>
+      ) : tab === 'admin' && profile?.role === 'admin' ? (
+        <ScrollView contentContainerStyle={s.form}>
+          <Text style={s.sectionTitle}>تنظیمات مدیر</Text>
+          <Text style={s.fieldLabel}>ساخت حساب کاربری جدید</Text>
           <TextInput style={s.input} placeholder="نام نمایشی" value={newDisplayName} onChangeText={setNewDisplayName} />
           <TextInput style={s.input} placeholder="نام کاربری (انگلیسی)" autoCapitalize="none" value={newUsername} onChangeText={setNewUsername} />
           <TextInput style={s.input} placeholder="رمز عبور (حداقل ۸ کاراکتر)" secureTextEntry value={newPassword} onChangeText={setNewPassword} />
           <Pressable style={s.primary} onPress={createPartner} disabled={busy}><Text style={s.primaryText}>{busy ? 'در حال ساخت…' : 'ساخت کاربر'}</Text></Pressable>
+          <Text style={s.sectionTitle}>کاربران ثبت‌شده</Text>
+          {profiles.map(p => <View key={p.id} style={s.notice}><Text style={s.noticeTitle}>{p.display_name || 'بدون نام'}  •  {p.role === 'admin' ? 'مدیر' : 'کاربر'}</Text></View>)}
+          <Text style={s.fieldLabel}>افزودن دسته‌بندی هزینه</Text>
+          <TextInput style={s.input} placeholder="نام دسته‌بندی جدید" value={newCategory} onChangeText={setNewCategory} />
+          <Pressable style={s.secondary} onPress={createCategory} disabled={busy}><Text style={s.secondaryText}>افزودن دسته‌بندی</Text></Pressable>
         </ScrollView>
       ) : tab === 'expenses' && showForm ? (
         <ScrollView contentContainerStyle={s.form}>
@@ -231,7 +292,8 @@ export default function App() {
           <View style={s.chips}>{categories.map(c => <Pressable key={c.id} onPress={() => setCategoryId(categoryId === c.id ? '' : c.id)} style={[s.chip, categoryId === c.id && s.chipActive]}><Text style={s.chipText}>{c.name}</Text></Pressable>)}</View>
           <TextInput style={[s.input, s.multiline]} placeholder="توضیحات (اختیاری)" multiline value={description} onChangeText={setDescription} />
           <Text style={s.fieldLabel}>تصویر فاکتور</Text>
-          {invoice ? <Image source={{ uri: invoice.uri }} style={s.invoicePreview} /> : invoiceUrl ? <Image source={{ uri: invoiceUrl }} style={s.invoicePreview} /> : null}
+          {invoice ? <Pressable onPress={() => setPreviewVisible(true)}><Image source={{ uri: invoice.uri }} style={s.invoicePreview} /></Pressable> : invoiceUrl ? <Pressable onPress={() => setPreviewVisible(true)}><Image source={{ uri: invoiceUrl }} style={s.invoicePreview} /></Pressable> : null}
+          {(invoice || invoiceUrl) && <Pressable style={s.previewClose} onPress={() => { setInvoice(null); setInvoiceUrl(null); }}><Text style={s.danger}>× حذف تصویر انتخاب‌شده</Text></Pressable>}
           <View style={s.actions}><Pressable style={s.secondary} onPress={() => chooseInvoice(false)}><Text style={s.secondaryText}>انتخاب تصویر</Text></Pressable><Pressable style={s.secondary} onPress={() => chooseInvoice(true)}><Text style={s.secondaryText}>دوربین</Text></Pressable></View>
           <Pressable style={s.primary} onPress={saveExpense} disabled={busy}><Text style={s.primaryText}>{busy ? 'در حال ذخیره…' : 'ذخیره هزینه'}</Text></Pressable>
           <Pressable style={s.cancel} onPress={resetForm}><Text style={s.muted}>انصراف</Text></Pressable>
@@ -244,6 +306,7 @@ export default function App() {
             renderItem={({ item }) => <View style={s.expenseCard}>
               <View style={s.cardTop}><Text style={s.expenseTitle}>{item.title}</Text><Text style={s.amount}>{money(item.amount)}</Text></View>
               <Text style={s.muted}>{dateText(item.expense_date)}  •  {item.expense_categories?.name || 'بدون دسته‌بندی'}</Text>
+              <Text style={s.muted}>ثبت‌کننده: {profiles.find(p => p.id === item.created_by)?.display_name || (item.created_by === session.user.id ? (profile?.display_name || 'شما') : 'کاربر')}</Text>
               {!!item.description && <Text style={s.description}>{item.description}</Text>}
               {!!item.invoice_path && <Text style={s.link}>فاکتور پیوست شده</Text>}
               {item.created_by === session.user.id && <View style={s.actions}><Pressable onPress={() => editExpense(item)}><Text style={s.link}>ویرایش</Text></Pressable><Pressable onPress={() => deleteExpense(item)}><Text style={s.danger}>حذف</Text></Pressable></View>}
@@ -253,9 +316,15 @@ export default function App() {
       ) : (
         <FlatList data={notifications} keyExtractor={item => item.id} contentContainerStyle={s.list}
           ListEmptyComponent={<Text style={s.empty}>اعلانی وجود ندارد.</Text>}
-          renderItem={({ item }) => <Pressable style={s.notice} onPress={() => markRead(item)}><Text style={s.noticeTitle}>{item.message}</Text><Text style={s.muted}>{new Date(item.created_at).toLocaleString('fa-IR')}</Text><Text style={s.link}>علامت‌گذاری به‌عنوان خوانده‌شده</Text></Pressable>}
+          renderItem={({ item }) => <Pressable style={s.notice} onPress={() => markRead(item)}><Text style={s.noticeTitle}>{item.message}</Text><Text style={s.muted}>{dateTimeText(item.created_at)}</Text><Text style={s.link}>علامت‌گذاری به‌عنوان خوانده‌شده</Text></Pressable>}
         />
       )}
+      <Modal visible={previewVisible} transparent animationType="fade" onRequestClose={() => setPreviewVisible(false)}>
+        <View style={s.previewBackdrop}>
+          <Pressable style={s.previewCloseTop} onPress={() => setPreviewVisible(false)}><Text style={s.previewCloseText}>×</Text></Pressable>
+          {(invoice || invoiceUrl) && <Image source={{ uri: invoice?.uri || invoiceUrl }} style={s.fullInvoice} />}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -273,10 +342,6 @@ const s = StyleSheet.create({
   primary: { backgroundColor: '#167d65', borderRadius: 13, padding: 15, alignItems: 'center', marginTop: 16 },
   primaryText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   link: { color: '#167d65', fontWeight: '700', textAlign: 'right', marginTop: 12 },
-  summary: { backgroundColor: '#123e34', borderRadius: 18, marginHorizontal: 16, padding: 18 },
-  summaryLabel: { color: '#d4e9e1', textAlign: 'right', fontSize: 13 },
-  summaryValue: { color: '#fff', textAlign: 'right', fontWeight: '900', fontSize: 25, marginTop: 8 },
-  summarySub: { color: '#d4e9e1', textAlign: 'right', marginTop: 4 },
   tabs: { flexDirection: 'row', marginHorizontal: 16, marginTop: 16, borderBottomWidth: 1, borderColor: '#dce5e0' },
   tab: { padding: 12, marginLeft: 8 },
   activeTab: { borderBottomWidth: 3, borderColor: '#167d65' },
@@ -307,5 +372,10 @@ const s = StyleSheet.create({
   secondaryText: { color: '#167d65', fontWeight: '700' },
   cancel: { alignItems: 'center', padding: 14 },
   notice: { backgroundColor: '#fff', borderRadius: 14, padding: 15, marginBottom: 10 },
-  noticeTitle: { color: '#20352d', textAlign: 'right', fontWeight: '800' }
+  noticeTitle: { color: '#20352d', textAlign: 'right', fontWeight: '800' },
+  previewBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.96)', alignItems: 'center', justifyContent: 'center', padding: 18 },
+  previewCloseTop: { position: 'absolute', top: 48, right: 20, zIndex: 5, width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  previewCloseText: { color: '#172b25', fontSize: 32, lineHeight: 36, fontWeight: '700' },
+  fullInvoice: { width: '100%', height: '80%', resizeMode: 'contain' },
+  previewClose: { alignSelf: 'flex-end', padding: 8 }
 });
