@@ -85,7 +85,8 @@ export default function App() {
     const username = email.trim().toLowerCase();
     if (!/^[a-z0-9_]{3,30}$/.test(username) || !password) return Alert.alert('اطلاعات ناقص', 'نام کاربری و رمز عبور معتبر را وارد کنید.');
     setBusy(true);
-    const result = await supabase.auth.signInWithPassword({ email: username + '@hzineh.local', password });
+    const loginEmail = username === 'junior' ? 'seyedmahdihsyny@gmail.com' : username + '@hzineh.local';
+    const result = await supabase.auth.signInWithPassword({ email: loginEmail, password });
     setBusy(false);
     if (result.error) Alert.alert('ورود ناموفق', 'نام کاربری یا رمز عبور اشتباه است.');
   }
