@@ -9,8 +9,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://mentihhsaenssxgktvmi.supabase.co';
+const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_CGDA-fYA_OLWoUfkBcIJwQ_AZqNUlkB';
 const supabase = supabaseUrl && supabaseKey
   ? createClient(supabaseUrl, supabaseKey, {
       auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false }
@@ -161,7 +161,7 @@ export default function App() {
   async function markRead(item) {
     const result = await supabase.from('notification_reads').upsert({
       notification_id: item.id, user_id: session.user.id
-    });
+    }, { onConflict: 'notification_id,user_id', ignoreDuplicates: true });
     if (result.error) Alert.alert('خطا', result.error.message);
   }
 
