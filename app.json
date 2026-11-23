@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "H-zineh",
+    "slug": "h-zineh",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.hzineh.expenses",
+      "versionCode": 1,
+      "permissions": ["CAMERA", "READ_MEDIA_IMAGES"]
+    },
+    "plugins": [
+      ["expo-image-picker", {
+        "photosPermission": "برای پیوست تصویر فاکتور به هزینه، دسترسی به تصاویر لازم است.",
+        "cameraPermission": "برای ثبت تصویر فاکتور، دسترسی به دوربین لازم است."
+      }]
+    ]
+  }
+}
