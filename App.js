@@ -23,10 +23,12 @@ const dateText = value => new Date(value + 'T00:00:00').toLocaleDateString('fa-I
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [authMode, setAuthMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const [profile, setProfile] = useState(null);
+  const [newUsername, setNewUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newDisplayName, setNewDisplayName] = useState('');
   const [busy, setBusy] = useState(false);
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -66,26 +68,40 @@ export default function App() {
   }, [session?.user?.id]);
 
   async function loadData() {
-    const [expenseResult, categoryResult, notificationResult] = await Promise.all([
+    const [expenseResult, categoryResult, notificationResult, profileResult] = await Promise.all([
       supabase.from('expenses').select('*, expense_categories(name)').order('expense_date', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('expense_categories').select('*').order('name'),
-      supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(40)
+      supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(40),
+      supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
     ]);
     if (expenseResult.error) Alert.alert('خطا', expenseResult.error.message);
     else setExpenses(expenseResult.data || []);
     if (!categoryResult.error) setCategories(categoryResult.data || []);
     if (!notificationResult.error) setNotifications(notificationResult.data || []);
+    if (!profileResult.error) setProfile(profileResult.data || null);
   }
 
   async function authenticate() {
-    if (!email.trim() || !password) return Alert.alert('اطلاعات ناقص', 'ایمیل و رمز عبور را وارد کنید.');
+    const username = email.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,30}$/.test(username) || !password) return Alert.alert('اطلاعات ناقص', 'نام کاربری و رمز عبور معتبر را وارد کنید.');
     setBusy(true);
-    const result = authMode === 'login'
-      ? await supabase.auth.signInWithPassword({ email: email.trim(), password })
-      : await supabase.auth.signUp({ email: email.trim(), password, options: { data: { display_name: displayName.trim() } } });
+    const result = await supabase.auth.signInWithPassword({ email: username + '@hzineh.local', password });
     setBusy(false);
-    if (result.error) Alert.alert('ورود ناموفق', result.error.message);
-    else if (authMode === 'signup' && !result.data.session) Alert.alert('ثبت‌نام انجام شد', 'برای فعال شدن حساب، ایمیل خود را تأیید کنید.');
+    if (result.error) Alert.alert('ورود ناموفق', 'نام کاربری یا رمز عبور اشتباه است.');
+  }
+
+  async function createPartner() {
+    if (!newUsername.trim() || !newPassword || newPassword.length < 8) return Alert.alert('اطلاعات ناقص', 'نام کاربری و رمز حداقل ۸ کاراکتری وارد کنید.');
+    setBusy(true);
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    const result = await supabase.functions.invoke('admin-create-user', {
+      body: { username: newUsername.trim().toLowerCase(), password: newPassword, display_name: newDisplayName.trim() },
+      headers: { Authorization: 'Bearer ' + currentSession.access_token }
+    });
+    setBusy(false);
+    if (result.error) return Alert.alert('ساخت کاربر ناموفق', result.data?.error || result.error.message);
+    setNewUsername(''); setNewPassword(''); setNewDisplayName('');
+    Alert.alert('انجام شد', 'حساب کاربر ساخته شد.');
   }
 
   function resetForm() {
@@ -175,12 +191,10 @@ export default function App() {
       <StatusBar barStyle="dark-content" />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.authWrap}>
         <Text style={s.brand}>H-zineh</Text><Text style={s.heading}>مدیریت هزینه‌های کارخانه</Text>
-        <Text style={s.muted}>{authMode === 'login' ? 'برای ورود، اطلاعات حساب را وارد کنید.' : 'حساب شریک جدید را بسازید.'}</Text>
-        {authMode === 'signup' && <TextInput style={s.input} placeholder="نام نمایشی" value={displayName} onChangeText={setDisplayName} />}
-        <TextInput style={s.input} placeholder="ایمیل" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
+        <Text style={s.muted}>برای ورود، نام کاربری و رمز عبوری را وارد کنید که مدیر در اختیارتان گذاشته است.</Text>
+        <TextInput style={s.input} placeholder="نام کاربری" autoCapitalize="none" value={email} onChangeText={setEmail} />
         <TextInput style={s.input} placeholder="رمز عبور" secureTextEntry value={password} onChangeText={setPassword} />
-        <Pressable style={s.primary} onPress={authenticate} disabled={busy}><Text style={s.primaryText}>{busy ? 'لطفاً صبر کنید…' : authMode === 'login' ? 'ورود' : 'ثبت‌نام'}</Text></Pressable>
-        <Pressable onPress={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}><Text style={s.link}>{authMode === 'login' ? 'حساب ندارید؟ ثبت‌نام' : 'قبلاً حساب ساخته‌اید؟ ورود'}</Text></Pressable>
+        <Pressable style={s.primary} onPress={authenticate} disabled={busy}><Text style={s.primaryText}>{busy ? 'لطفاً صبر کنید…' : 'ورود'}</Text></Pressable>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -196,8 +210,17 @@ export default function App() {
       <View style={s.tabs}>
         <Pressable onPress={() => { setTab('expenses'); setShowForm(false); }} style={[s.tab, tab === 'expenses' && s.activeTab]}><Text style={[s.tabText, tab === 'expenses' && s.activeTabText]}>هزینه‌ها</Text></Pressable>
         <Pressable onPress={() => { setTab('notifications'); setShowForm(false); }} style={[s.tab, tab === 'notifications' && s.activeTab]}><Text style={[s.tabText, tab === 'notifications' && s.activeTabText]}>اعلان‌ها</Text></Pressable>
+        {profile?.role === 'admin' && <Pressable onPress={() => { setTab('admin'); setShowForm(false); }} style={[s.tab, tab === 'admin' && s.activeTab]}><Text style={[s.tabText, tab === 'admin' && s.activeTabText]}>مدیریت کاربران</Text></Pressable>}
       </View>
-      {tab === 'expenses' && showForm ? (
+      {tab === 'admin' && profile?.role === 'admin' ? (
+        <ScrollView contentContainerStyle={s.form}>
+          <Text style={s.sectionTitle}>ساخت حساب کاربری جدید</Text>
+          <TextInput style={s.input} placeholder="نام نمایشی" value={newDisplayName} onChangeText={setNewDisplayName} />
+          <TextInput style={s.input} placeholder="نام کاربری (انگلیسی)" autoCapitalize="none" value={newUsername} onChangeText={setNewUsername} />
+          <TextInput style={s.input} placeholder="رمز عبور (حداقل ۸ کاراکتر)" secureTextEntry value={newPassword} onChangeText={setNewPassword} />
+          <Pressable style={s.primary} onPress={createPartner} disabled={busy}><Text style={s.primaryText}>{busy ? 'در حال ساخت…' : 'ساخت کاربر'}</Text></Pressable>
+        </ScrollView>
+      ) : tab === 'expenses' && showForm ? (
         <ScrollView contentContainerStyle={s.form}>
           <Text style={s.sectionTitle}>{editing ? 'ویرایش هزینه' : 'ثبت هزینه جدید'}</Text>
           <TextInput style={s.input} placeholder="عنوان هزینه" value={title} onChangeText={setTitle} />
