@@ -164,6 +164,7 @@ function AppContent() {
   const [invoice, setInvoice] = useState(null);
   const [invoiceUrl, setInvoiceUrl] = useState(null);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewInvoiceUri, setPreviewInvoiceUri] = useState(null);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [reportFrom, setReportFrom] = useState('');
@@ -370,6 +371,24 @@ function AppContent() {
     setShowForm(true); setTab('add');
   }
 
+  async function openInvoicePreview(item) {
+    if (!item?.invoice_path) return;
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.storage
+        .from('invoices')
+        .createSignedUrl(item.invoice_path, 3600);
+      if (error) throw error;
+      if (!data?.signedUrl) throw new Error('لینک نمایش فاکتور ساخته نشد.');
+      setPreviewInvoiceUri(data.signedUrl);
+      setPreviewVisible(true);
+    } catch (error) {
+      Alert.alert('نمایش فاکتور ناموفق بود', error?.message || 'دسترسی به تصویر امکان‌پذیر نیست.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function deleteExpense(item) {
     Alert.alert('حذف هزینه', 'از حذف این هزینه مطمئن هستید؟', [
       { text: 'انصراف', style: 'cancel' },
@@ -530,7 +549,7 @@ function AppContent() {
       <Txt style={s.muted}>{dateText(item.expense_date)}  •  {item.expense_categories?.name || 'بدون دسته‌بندی'}</Txt>
       <Txt style={s.muted}>ثبت‌کننده: {owner?.username || (own ? profile?.username : null) || 'نامشخص'}</Txt>
       {!!item.description && <Txt style={s.description}>{item.description}</Txt>}
-      {!!item.invoice_path && <Txt style={s.link}>فاکتور پیوست شده</Txt>}
+      {!!item.invoice_path && <Pressable onPress={() => openInvoicePreview(item)} hitSlop={8}><Txt style={s.link}>فاکتور پیوست شده</Txt></Pressable>}
       {own && <View style={s.actionRow}>
         <Pressable onPress={() => editExpense(item)}><Txt style={s.link}>ویرایش</Txt></Pressable>
         <Pressable onPress={() => deleteExpense(item)}><Txt style={s.danger}>حذف</Txt></Pressable>
@@ -761,10 +780,10 @@ function AppContent() {
         ))}
       </View>
 
-      <Modal visible={previewVisible} transparent animationType="fade" onRequestClose={() => setPreviewVisible(false)}>
+      <Modal visible={previewVisible} transparent animationType="fade" onRequestClose={() => { setPreviewVisible(false); setPreviewInvoiceUri(null); }}>
         <View style={s.previewBackdrop}>
-          <Pressable style={s.previewCloseTop} onPress={() => setPreviewVisible(false)}><Txt style={s.previewCloseText}>←</Txt></Pressable>
-          {(invoice || invoiceUrl) && <Image source={{ uri: invoice?.uri || invoiceUrl }} style={s.fullInvoice} />}
+          <Pressable style={s.previewCloseTop} onPress={() => { setPreviewVisible(false); setPreviewInvoiceUri(null); }}><Txt style={s.previewCloseText}>←</Txt></Pressable>
+          {(previewInvoiceUri || invoice || invoiceUrl) && <Image source={{ uri: previewInvoiceUri || invoice?.uri || invoiceUrl }} style={s.fullInvoice} />}
         </View>
       </Modal>
     </SafeAreaView>
