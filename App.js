@@ -86,6 +86,7 @@ function AppContent() {
   const [reportFrom, setReportFrom] = useState('');
   const [reportTo, setReportTo] = useState('');
   const [selectedReportUser, setSelectedReportUser] = useState('all');
+  const [reportPreset, setReportPreset] = useState('custom');
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newDisplayName, setNewDisplayName] = useState('');
@@ -326,6 +327,41 @@ function AppContent() {
     return String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
   }
 
+  function applyReportPreset(preset) {
+    const now = new Date(today() + 'T00:00:00Z');
+    const iso = d => d.toISOString().slice(0, 10);
+    const startMonth = d => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+    const endMonth = d => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0));
+    let from = '', to = iso(now);
+    if (preset === 'today') from = to;
+    else if (preset === 'yesterday') { const d = new Date(now); d.setUTCDate(d.getUTCDate() - 1); from = to = iso(d); }
+    else if (preset === '7days') { const d = new Date(now); d.setUTCDate(d.getUTCDate() - 6); from = iso(d); }
+    else if (preset === 'month') from = iso(startMonth(now));
+    else if (preset === 'lastMonth') { const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)); from = iso(d); to = iso(endMonth(d)); }
+    else if (preset === 'year') from = now.getUTCFullYear() + '-01-01';
+    else { from = ''; to = ''; }
+    setReportFrom(from); setReportTo(to); setReportPreset(preset);
+  }
+
+  async function deleteHistoryItem(item) {
+    Alert.alert('حذف سابقه', 'این ردیف از سوابق حذف برای همیشه پاک شود؟ این کار هزینه اصلی را تغییر نمی‌دهد.', [
+      { text: 'انصراف', style: 'cancel' },
+      { text: 'حذف سابقه', style: 'destructive', onPress: async () => {
+        setBusy(true);
+        try {
+          const result = await supabase.from('expense_history').delete().eq('id', item.id);
+          if (result.error) throw result.error;
+          setHistory(prev => prev.filter(x => x.id !== item.id));
+          Alert.alert('انجام شد', 'سابقه حذف شد.');
+        } catch (e) {
+          Alert.alert('حذف ناموفق', e?.message || 'حذف سابقه انجام نشد.');
+        } finally {
+          setBusy(false);
+        }
+      }}
+    ]);
+  }
+
   function historyTitle(item) {
     const data = item.old_data || item.new_data || {};
     const actor = profiles.find(p => p.id === item.actor_id);
@@ -545,6 +581,7 @@ function AppContent() {
                 <Txt style={s.muted}>مبلغ: {money(info.data.amount)}</Txt>
                 <Txt style={s.muted}>تاریخ هزینه: {dateText(info.data.expense_date)}</Txt>
                 <Txt style={s.muted}>زمان حذف: {dateTimeText(item.created_at)}</Txt>
+                <Pressable style={s.dangerButton} onPress={() => deleteHistoryItem(item)} disabled={busy}><Txt style={s.dangerText}>حذف این سابقه</Txt></Pressable>
               </View>;
             })}
           </ScrollView>
@@ -554,11 +591,15 @@ function AppContent() {
           <ScrollView contentContainerStyle={s.form}>
             <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => { setAdminPage(''); setSettingsPage('admin'); }}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
             <Txt style={s.sectionTitle}>گزارش هزینه و فاکتور کاربران</Txt>
-            <Txt style={s.fieldLabel}>از تاریخ شمسی (مثلاً ۱۴۰۵/۰۸/۰۱)</Txt>
-            <TextInput style={s.input} value={jalaliInput(reportFrom)} onChangeText={v => setReportFrom(jalaliToGregorian(v))} placeholder="۱۴۰۵/۰۸/۰۱" placeholderTextColor={theme.muted} keyboardType="numeric" />
+            <Txt style={s.fieldLabel}>نوع فیلتر تاریخ</Txt>
+            <View style={s.chips}>
+              {[['today','امروز'],['yesterday','دیروز'],['7days','۷ روز اخیر'],['month','ماه جاری'],['lastMonth','ماه قبل'],['year','سال جاری'],['custom','بازه دلخواه']].map(([key,label]) => <Pressable key={key} style={[s.chip, reportPreset === key && s.chipActive]} onPress={() => applyReportPreset(key)}><Txt style={s.chipText}>{label}</Txt></Pressable>)}
+            </View>
+            <Txt style={s.fieldLabel}>از تاریخ شمسی</Txt>
+            <TextInput style={s.input} value={jalaliInput(reportFrom)} onChangeText={v => { setReportFrom(jalaliToGregorian(v)); setReportPreset('custom'); }} placeholder="۱۴۰۵/۰۸/۰۱" placeholderTextColor={theme.muted} keyboardType="numeric" />
             <Txt style={s.fieldLabel}>تا تاریخ شمسی</Txt>
-            <TextInput style={s.input} value={jalaliInput(reportTo)} onChangeText={v => setReportTo(jalaliToGregorian(v))} placeholder="۱۴۰۵/۰۸/۳۰" placeholderTextColor={theme.muted} keyboardType="numeric" />
-            <Pressable style={s.secondary} onPress={() => { setReportFrom(''); setReportTo(''); }}><Txt style={s.secondaryText}>پاک کردن بازه</Txt></Pressable>
+            <TextInput style={s.input} value={jalaliInput(reportTo)} onChangeText={v => { setReportTo(jalaliToGregorian(v)); setReportPreset('custom'); }} placeholder="۱۴۰۵/۰۸/۳۰" placeholderTextColor={theme.muted} keyboardType="numeric" />
+            <Pressable style={s.secondary} onPress={() => applyReportPreset('custom')}><Txt style={s.secondaryText}>پاک کردن فیلتر تاریخ</Txt></Pressable>
             <Txt style={s.fieldLabel}>انتخاب گزارش</Txt>
             <View style={s.chips}>
               <Pressable style={[s.chip, selectedReportUser === 'all' && s.chipActive]} onPress={() => setSelectedReportUser('all')}><Txt style={s.chipText}>همه کاربران</Txt></Pressable>
