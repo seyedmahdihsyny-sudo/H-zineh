@@ -19,8 +19,8 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 const money = value => new Intl.NumberFormat('fa-IR').format(Number(value || 0)) + ' تومان';
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-const dateText = value => value ? new Date(value + 'T12:00:00+03:30').toLocaleDateString('fa-IR', { timeZone: 'Asia/Tehran' }) : '—';
-const dateTimeText = value => value ? new Date(value).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran', dateStyle: 'medium', timeStyle: 'short' }) : '—';
+const dateText = value => value ? new Date(value + 'T12:00:00+03:30').toLocaleDateString('fa-IR-u-ca-persian', { timeZone: 'Asia/Tehran', calendar: 'persian', numberingSystem: 'arabext' }) : '—';
+const dateTimeText = value => value ? new Date(value).toLocaleString('fa-IR-u-ca-persian', { timeZone: 'Asia/Tehran', calendar: 'persian', numberingSystem: 'arabext', dateStyle: 'medium', timeStyle: 'short' }) : '—';
 const palettes = {
   سبز: { bg: '#eaf6f4', card: '#ffffff', primary: '#078577', text: '#142b35', muted: '#70838a', border: '#c9dfdc' },
   آبی: { bg: '#f2f5fa', card: '#ffffff', primary: '#315f9b', text: '#1d2c40', muted: '#718096', border: '#dce5f0' },
@@ -59,6 +59,7 @@ function AppContent() {
   const [toDate, setToDate] = useState('');
   const [reportFrom, setReportFrom] = useState('');
   const [reportTo, setReportTo] = useState('');
+  const [selectedReportUser, setSelectedReportUser] = useState('all');
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newDisplayName, setNewDisplayName] = useState('');
@@ -180,7 +181,7 @@ function AppContent() {
       invoicePath = path;
     }
     const payload = {
-      title: title.trim(), amount: numericAmount, expense_date: expenseDate,
+      title: title.trim(), amount: numericAmount, expense_date: editing ? editing.expense_date : automaticExpenseDate,
       category_id: categoryId || null, partner_id: session.user.id,
       created_by: session.user.id, description: description.trim(), invoice_path: invoicePath
     };
@@ -268,12 +269,13 @@ function AppContent() {
   const reportUsers = useMemo(() => profiles.map(p => {
     const rows = reportExpenses.filter(x => x.created_by === p.id || x.partner_id === p.id);
     return { profile: p, rows, total: rows.reduce((sum, x) => sum + Number(x.amount || 0), 0) };
-  }).filter(x => x.rows.length || profile?.role === 'admin'), [profiles, reportExpenses, profile?.role]);
+  }).filter(x => x.rows.length), [profiles, reportExpenses]);
+  const selectedReportGroup = selectedReportUser === 'all' ? { profile: { id: 'all', username: 'همه کاربران' }, rows: reportExpenses, total: reportExpenses.reduce((sum,x)=>sum+Number(x.amount||0),0) } : reportUsers.find(x => x.profile.id === selectedReportUser);
 
   async function exportUserReport(group) {
     const rows = group.rows.slice().sort((a,b) => a.expense_date.localeCompare(b.expense_date));
-    const body = rows.map(x => '<tr><td>' + escapeHtml(dateText(x.expense_date)) + '</td><td>' + escapeHtml(x.title) + '</td><td>' + escapeHtml(money(x.amount)) + '</td><td>' + escapeHtml(x.description || '') + '</td></tr>').join('');
-    const html = '<html lang="fa" dir="rtl"><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:24px;color:#222}h1,h2{text-align:right}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{border:1px solid #bbb;padding:9px;text-align:right}th{background:#eee}.total{font-size:18px;font-weight:bold;margin-top:18px}</style><h1>گزارش هزینه‌های H-zineh</h1><h2>کاربر: ' + escapeHtml(group.profile.username || group.profile.display_name || 'بدون نام') + '</h2><p>بازه: ' + escapeHtml(reportFrom || 'ابتدای سوابق') + ' تا ' + escapeHtml(reportTo || 'امروز') + '</p><table><thead><tr><th>تاریخ</th><th>شرح هزینه</th><th>مبلغ</th><th>توضیحات</th></tr></thead><tbody>' + body + '</tbody></table><p class="total">جمع کل: ' + escapeHtml(money(group.total)) + '</p></html>';
+    const body = rows.map(x => { const owner = profiles.find(p => p.id === (x.created_by || x.partner_id)); return '<tr><td>' + escapeHtml(dateText(x.expense_date)) + '</td><td>' + escapeHtml(owner?.username || owner?.display_name || '—') + '</td><td>' + escapeHtml(x.title) + '</td><td>' + escapeHtml(money(x.amount)) + '</td><td>' + escapeHtml(x.description || '') + '</td></tr>'; }).join('');
+    const html = '<html lang="fa" dir="rtl"><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:24px;color:#222}h1,h2{text-align:right}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{border:1px solid #bbb;padding:9px;text-align:right}th{background:#eee}.total{font-size:18px;font-weight:bold;margin-top:18px}</style><h1>گزارش هزینه‌های H-zineh</h1><h2>کاربر: ' + escapeHtml(group.profile.username || group.profile.display_name || 'بدون نام') + '</h2><p>بازه: ' + escapeHtml(reportFrom ? dateText(reportFrom) : 'ابتدای سوابق') + ' تا ' + escapeHtml(reportTo ? dateText(reportTo) : 'امروز') + '</p><table><thead><tr><th>تاریخ شمسی</th><th>ثبت‌کننده</th><th>شرح هزینه</th><th>مبلغ</th><th>توضیحات</th></tr></thead><tbody>' + body + '</tbody></table><p class="total">جمع کل: ' + escapeHtml(money(group.total)) + '</p></html>';
     try {
       const file = await Print.printToFileAsync({ html, base64: false });
       if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(file.uri, { mimeType: 'application/pdf', dialogTitle: 'فاکتور هزینه‌های کاربر' });
@@ -359,8 +361,7 @@ function AppContent() {
             <TextInput style={s.input} placeholder="مثلاً خرید قطعات صنعتی" placeholderTextColor={theme.muted} value={title} onChangeText={setTitle} />
             <Txt style={s.fieldLabel}>مبلغ (تومان)</Txt>
             <TextInput style={s.input} placeholder="مبلغ را وارد کنید" placeholderTextColor={theme.muted} keyboardType="numeric" value={amount} onChangeText={setAmount} />
-            <Txt style={s.fieldLabel}>تاریخ (میلادی: YYYY-MM-DD)</Txt>
-            <TextInput style={s.input} placeholder="2026-11-24" placeholderTextColor={theme.muted} value={expenseDate} onChangeText={setExpenseDate} />
+            <Txt style={s.muted}>تاریخ و ساعت ثبت این هزینه به‌صورت خودکار از زمان سرور ثبت می‌شود و قابل تغییر نیست.</Txt>
             <Txt style={s.fieldLabel}>دسته‌بندی</Txt>
             <View style={s.chips}>{categories.map(c => <Pressable key={c.id} onPress={() => setCategoryId(categoryId === c.id ? '' : c.id)} style={[s.chip, categoryId === c.id && s.chipActive]}><Txt style={s.chipText}>{c.name}</Txt></Pressable>)}</View>
             <TextInput style={[s.input, s.multiline]} placeholder="توضیحات (اختیاری)" placeholderTextColor={theme.muted} multiline value={description} onChangeText={setDescription} />
@@ -403,7 +404,10 @@ function AppContent() {
               <View style={s.settingsRowText}><Txt style={s.cardTitle}>تم و رنگ برنامه</Txt><Txt style={s.muted}>رنگ، حالت روشن و تیره، فونت و اندازه نوشته</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
             </Pressable>
             <Pressable style={s.settingsRow} onPress={() => setSettingsPage('contact')}>
-              <View style={s.settingsRowText}><Txt style={s.cardTitle}>ارتباط با ما</Txt><Txt style={s.muted}>اطلاعات تماس و اشتراک‌گذاری برنامه</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
+              <View style={s.settingsRowText}><Txt style={s.cardTitle}>ارتباط با ما</Txt><Txt style={s.muted}>اطلاعات تماس</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
+            </Pressable>
+            <Pressable style={s.settingsRow} onPress={shareApp}>
+              <View style={s.settingsRowText}><Txt style={s.cardTitle}>اشتراک‌گذاری برنامه</Txt><Txt style={s.muted}>معرفی H-zineh به دیگران</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
             </Pressable>
             {isAdmin && <Pressable style={s.settingsRow} onPress={() => setSettingsPage('admin')}>
               <View style={s.settingsRowText}><Txt style={s.cardTitle}>مدیریت برنامه</Txt><Txt style={s.muted}>کاربران، گزارش‌ها، دسته‌بندی‌ها و سوابق</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
@@ -448,7 +452,7 @@ function AppContent() {
         {tab === 'settings' && settingsPage === 'contact' && !adminPage && (
           <ScrollView contentContainerStyle={s.form}>
             <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setSettingsPage('')}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
-            <Txt style={s.sectionTitle}>ارتباط با ما و اشتراک‌گذاری</Txt>
+            <Txt style={s.sectionTitle}>ارتباط با ما</Txt>
             <View style={s.card}>
               <Txt style={s.muted}>{contactText || 'اطلاعات تماس هنوز توسط مدیر ثبت نشده است.'}</Txt>
               <Pressable style={s.secondary} onPress={() => Alert.alert('ارتباط با ما', contactText || 'اطلاعات تماس ثبت نشده است.')}><Txt style={s.secondaryText}>مشاهده اطلاعات تماس</Txt></Pressable>
@@ -458,7 +462,6 @@ function AppContent() {
                 <Pressable style={s.primary} onPress={saveContact} disabled={busy}><Txt style={s.primaryText}>ذخیره اطلاعات تماس</Txt></Pressable>
               </>}
             </View>
-            <Pressable style={s.secondary} onPress={shareApp}><Txt style={s.secondaryText}>اشتراک‌گذاری برنامه</Txt></Pressable>
           </ScrollView>
         )}
 
@@ -517,13 +520,12 @@ function AppContent() {
             <Txt style={s.fieldLabel}>تا تاریخ (YYYY-MM-DD)</Txt>
             <TextInput style={s.input} value={reportTo} onChangeText={setReportTo} placeholder="پایان بازه" placeholderTextColor={theme.muted} />
             <Pressable style={s.secondary} onPress={() => { setReportFrom(''); setReportTo(''); }}><Txt style={s.secondaryText}>پاک کردن بازه</Txt></Pressable>
-            <View style={s.totalCard}><Txt style={s.muted}>جمع کل هزینه‌های همه کاربران</Txt><Txt style={s.total}>{money(reportExpenses.reduce((sum,x)=>sum+Number(x.amount||0),0))}</Txt></View>
-            {reportUsers.map(group => <View key={group.profile.id} style={s.card}>
-              <Txt style={s.cardTitle}>{group.profile.username || group.profile.display_name || 'بدون نام'}</Txt>
-              <Txt style={s.muted}>تعداد فاکتور: {group.rows.length}</Txt>
-              <Txt style={s.amount}>{money(group.total)}</Txt>
-              <Pressable style={s.primary} onPress={() => exportUserReport(group)} disabled={!group.rows.length}><Txt style={s.primaryText}>دریافت فاکتور PDF این کاربر</Txt></Pressable>
-            </View>)}
+            <Txt style={s.fieldLabel}>انتخاب گزارش</Txt>
+            <View style={s.chips}>
+              <Pressable style={[s.chip, selectedReportUser === 'all' && s.chipActive]} onPress={() => setSelectedReportUser('all')}><Txt style={s.chipText}>همه کاربران</Txt></Pressable>
+              {reportUsers.map(group => <Pressable key={group.profile.id} style={[s.chip, selectedReportUser === group.profile.id && s.chipActive]} onPress={() => setSelectedReportUser(group.profile.id)}><Txt style={s.chipText}>{group.profile.username || group.profile.display_name || 'بدون نام'}</Txt></Pressable>)}
+            </View>
+            {selectedReportGroup && <View style={s.totalCard}><Txt style={s.muted}>گزارش: {selectedReportGroup.profile.username}</Txt><Txt style={s.muted}>تعداد فاکتور: {selectedReportGroup.rows.length}</Txt><Txt style={s.total}>{money(selectedReportGroup.total)}</Txt><Pressable style={s.primary} onPress={() => exportUserReport(selectedReportGroup)} disabled={!selectedReportGroup.rows.length}><Txt style={s.primaryText}>ساخت و دریافت فاکتور PDF</Txt></Pressable></View>}
           </ScrollView>
         )}
       </View>
