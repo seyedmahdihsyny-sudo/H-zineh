@@ -69,8 +69,8 @@ export default function App() {
 
   const theme = palettes[themeName] || palettes.سبز;
   const fontFamily = fontName === 'سریف' ? 'serif' : fontName === 'تک‌فاصله' ? 'monospace' : undefined;
-  const Txt = ({ style, ...props }) => <Text {...props} style={[fontFamily ? { fontFamily } : null, style]} />;
-  const s = useMemo(() => makeStyles(theme, fontFamily), [themeName, fontName]);
+  const Txt = ({ style, ...props }) => { const flat = StyleSheet.flatten(style) || {}; const scaled = flat.fontSize ? { ...flat, fontSize: flat.fontSize * fontScale } : flat; return <Text {...props} style={[fontFamily ? { fontFamily } : null, scaled]} />; };
+  const s = useMemo(() => makeStyles(theme, fontFamily, fontScale), [themeName, fontName, fontScale]);
 
   useEffect(() => {
     (async () => {
@@ -495,7 +495,7 @@ export default function App() {
   );
 }
 
-function makeStyles(t, fontFamily) {
+function makeStyles(t, fontFamily, fontScale) {
   const f = fontFamily ? { fontFamily } : {};
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg, direction: 'rtl' },
@@ -507,7 +507,7 @@ function makeStyles(t, fontFamily) {
     brandSmall: { fontSize: 22, fontWeight: '900', color: t.primary, textAlign: 'right', ...f },
     heading: { fontSize: 21, fontWeight: '800', color: t.text, textAlign: 'center', marginBottom: 8, ...f },
     muted: { color: t.muted, fontSize: 13, textAlign: 'right', marginVertical: 4, ...f },
-    input: { backgroundColor: t.card, borderWidth: 1, borderColor: t.border, borderRadius: 13, paddingHorizontal: 14, paddingVertical: 13, marginTop: 10, textAlign: 'right', color: t.text, fontFamily },
+    input: { backgroundColor: t.card, borderWidth: 1, borderColor: t.border, borderRadius: 13, paddingHorizontal: 14, paddingVertical: 13, marginTop: 10, textAlign: 'right', color: t.text, fontFamily, fontSize: 14 * fontScale },
     primary: { backgroundColor: t.primary, borderRadius: 13, padding: 14, alignItems: 'center', marginTop: 14 },
     primaryText: { color: '#fff', fontSize: 14, fontWeight: '800', ...f },
     secondary: { borderWidth: 1, borderColor: t.primary, borderRadius: 11, padding: 12, alignItems: 'center', marginTop: 10, flex: 1 },
