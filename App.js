@@ -21,6 +21,32 @@ const money = value => new Intl.NumberFormat('fa-IR').format(Number(value || 0))
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const dateText = value => value ? new Date(value + 'T12:00:00+03:30').toLocaleDateString('fa-IR-u-ca-persian', { timeZone: 'Asia/Tehran', calendar: 'persian', numberingSystem: 'arabext' }) : '—';
 const dateTimeText = value => value ? new Date(value).toLocaleString('fa-IR-u-ca-persian', { timeZone: 'Asia/Tehran', calendar: 'persian', numberingSystem: 'arabext', dateStyle: 'medium', timeStyle: 'short' }) : '—';
+const jalaliInput = value => {
+  if (!value) return '';
+  const parts = new Intl.DateTimeFormat('en-u-ca-persian', { timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(value + 'T12:00:00+03:30'));
+  const get = type => parts.find(p => p.type === type)?.value || '';
+  return get('year') + '/' + get('month') + '/' + get('day');
+};
+const jalaliToGregorian = value => {
+  const digits = String(value).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+  const m = digits.match(/^(\\d{4})[\\/-](\\d{1,2})[\\/-](\\d{1,2})$/);
+  if (!m) return '';
+  let jy = Number(m[1]), jm = Number(m[2]), jd = Number(m[3]);
+  if (jm < 1 || jm > 12 || jd < 1 || jd > 31) return '';
+  jy += 1595;
+  let days = -355668 + 365 * jy + Math.floor(jy / 33) * 8 + Math.floor(((jy % 33) + 3) / 4) + jd + (jm < 7 ? (jm - 1) * 31 : (jm - 7) * 30 + 186);
+  let gy = 400 * Math.floor(days / 146097);
+  days %= 146097;
+  if (days > 36524) { gy += 100 * Math.floor(--days / 36524); days %= 36524; if (days >= 365) days++; }
+  gy += 4 * Math.floor(days / 1461); days %= 1461;
+  if (days > 365) { gy += Math.floor((days - 1) / 365); days = (days - 1) % 365; }
+  let gd = days + 1;
+  const leap = (gy % 4 === 0 && gy % 100 !== 0) || gy % 400 === 0;
+  const monthDays = [0,31,leap ? 29 : 28,31,30,31,30,31,31,30,31,30,31];
+  let gm = 1;
+  while (gm <= 12 && gd > monthDays[gm]) { gd -= monthDays[gm]; gm++; }
+  return String(gy).padStart(4,'0') + '-' + String(gm).padStart(2,'0') + '-' + String(gd).padStart(2,'0');
+};
 const palettes = {
   سبز: { bg: '#eaf6f4', card: '#ffffff', primary: '#078577', text: '#142b35', muted: '#70838a', border: '#c9dfdc' },
   آبی: { bg: '#f2f5fa', card: '#ffffff', primary: '#315f9b', text: '#1d2c40', muted: '#718096', border: '#dce5f0' },
@@ -528,10 +554,10 @@ function AppContent() {
           <ScrollView contentContainerStyle={s.form}>
             <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => { setAdminPage(''); setSettingsPage('admin'); }}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
             <Txt style={s.sectionTitle}>گزارش هزینه و فاکتور کاربران</Txt>
-            <Txt style={s.fieldLabel}>از تاریخ (YYYY-MM-DD)</Txt>
-            <TextInput style={s.input} value={reportFrom} onChangeText={setReportFrom} placeholder="شروع بازه" placeholderTextColor={theme.muted} />
-            <Txt style={s.fieldLabel}>تا تاریخ (YYYY-MM-DD)</Txt>
-            <TextInput style={s.input} value={reportTo} onChangeText={setReportTo} placeholder="پایان بازه" placeholderTextColor={theme.muted} />
+            <Txt style={s.fieldLabel}>از تاریخ شمسی (مثلاً ۱۴۰۵/۰۸/۰۱)</Txt>
+            <TextInput style={s.input} value={jalaliInput(reportFrom)} onChangeText={v => setReportFrom(jalaliToGregorian(v))} placeholder="۱۴۰۵/۰۸/۰۱" placeholderTextColor={theme.muted} keyboardType="numeric" />
+            <Txt style={s.fieldLabel}>تا تاریخ شمسی</Txt>
+            <TextInput style={s.input} value={jalaliInput(reportTo)} onChangeText={v => setReportTo(jalaliToGregorian(v))} placeholder="۱۴۰۵/۰۸/۳۰" placeholderTextColor={theme.muted} keyboardType="numeric" />
             <Pressable style={s.secondary} onPress={() => { setReportFrom(''); setReportTo(''); }}><Txt style={s.secondaryText}>پاک کردن بازه</Txt></Pressable>
             <Txt style={s.fieldLabel}>انتخاب گزارش</Txt>
             <View style={s.chips}>
