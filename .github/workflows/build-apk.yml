@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Install Expo-compatible native dependencies
+        run: npx expo install react-native-safe-area-context
+
       - name: Generate native Android project
         run: npx expo prebuild --platform android --non-interactive
 
