@@ -41,6 +41,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState('all');
   const [adminPage, setAdminPage] = useState('');
+  const [settingsPage, setSettingsPage] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [title, setTitle] = useState('');
@@ -389,55 +390,106 @@ export default function App() {
           </ScrollView>
         )}
 
-        {tab === 'settings' && !adminPage && (
+        {tab === 'settings' && !adminPage && !settingsPage && (
           <ScrollView contentContainerStyle={s.form}>
             <Txt style={s.sectionTitle}>تنظیمات</Txt>
+            <Pressable style={s.settingsRow} onPress={() => setSettingsPage('profile')}>
+              <View style={s.settingsRowText}><Txt style={s.cardTitle}>حساب کاربری</Txt><Txt style={s.muted}>نام نمایشی، اطلاعات حساب و تغییر رمز</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
+            </Pressable>
+            <Pressable style={s.settingsRow} onPress={() => setSettingsPage('theme')}>
+              <View style={s.settingsRowText}><Txt style={s.cardTitle}>تم و رنگ برنامه</Txt><Txt style={s.muted}>انتخاب رنگ و حالت روشن یا تیره</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
+            </Pressable>
+            <Pressable style={s.settingsRow} onPress={() => setSettingsPage('font')}>
+              <View style={s.settingsRowText}><Txt style={s.cardTitle}>فونت برنامه</Txt><Txt style={s.muted}>تغییر نوع نوشته‌ها</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
+            </Pressable>
+            <Pressable style={s.settingsRow} onPress={() => setSettingsPage('scale')}>
+              <View style={s.settingsRowText}><Txt style={s.cardTitle}>اندازه نوشته</Txt><Txt style={s.muted}>کوچک، معمولی یا بزرگ</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
+            </Pressable>
+            <Pressable style={s.settingsRow} onPress={() => setSettingsPage('contact')}>
+              <View style={s.settingsRowText}><Txt style={s.cardTitle}>ارتباط با ما و اشتراک‌گذاری</Txt><Txt style={s.muted}>اطلاعات تماس و معرفی برنامه</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
+            </Pressable>
+            {isAdmin && <Pressable style={s.settingsRow} onPress={() => setSettingsPage('admin')}>
+              <View style={s.settingsRowText}><Txt style={s.cardTitle}>مدیریت برنامه</Txt><Txt style={s.muted}>کاربران، گزارش‌ها، دسته‌بندی‌ها و سوابق</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
+            </Pressable>}
+            <Pressable style={s.cancel} onPress={() => supabase.auth.signOut()}><Txt style={s.danger}>خروج از حساب</Txt></Pressable>
+          </ScrollView>
+        )}
+
+        {tab === 'settings' && settingsPage === 'profile' && !adminPage && (
+          <ScrollView contentContainerStyle={s.form}>
+            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setSettingsPage('')}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
+            <Txt style={s.sectionTitle}>حساب کاربری</Txt>
             <View style={s.card}>
-              <Txt style={s.cardTitle}>پروفایل من</Txt>
               <Txt style={s.profileLine}>نام کاربری: {profile?.username || 'ثبت نشده'}</Txt>
               <Txt style={s.profileLine}>نام نمایشی: {profile?.display_name || '—'}</Txt>
               <Txt style={s.profileLine}>نوع حساب: {isAdmin ? 'مدیر اصلی' : 'شریک'}</Txt>
               <Txt style={s.fieldLabel}>نام نمایشی</Txt>
               <TextInput style={s.input} value={displayNameEdit} onChangeText={setDisplayNameEdit} placeholder="نام نمایشی" placeholderTextColor={theme.muted} />
               <Pressable style={s.secondary} onPress={saveProfile} disabled={busy}><Txt style={s.secondaryText}>ذخیره پروفایل</Txt></Pressable>
-              <Txt style={s.fieldLabel}>تغییر رمز عبور</Txt>
+            </View>
+            <View style={s.card}>
+              <Txt style={s.cardTitle}>تغییر رمز عبور</Txt>
               <TextInput style={s.input} secureTextEntry value={passwordEdit} onChangeText={setPasswordEdit} placeholder="رمز جدید، حداقل ۸ کاراکتر" placeholderTextColor={theme.muted} />
-              <Pressable style={s.secondary} onPress={changePassword} disabled={busy}><Txt style={s.secondaryText}>تغییر رمز عبور</Txt></Pressable>
+              <Pressable style={s.primary} onPress={changePassword} disabled={busy}><Txt style={s.primaryText}>تغییر رمز عبور</Txt></Pressable>
             </View>
-
-            <View style={s.card}>
-              <Txt style={s.cardTitle}>ظاهر برنامه</Txt>
-              <Txt style={s.fieldLabel}>انتخاب تم و رنگ</Txt>
-              <View style={s.chips}>{Object.keys(palettes).map(name => <Pressable key={name} onPress={() => saveAppearance('theme', name)} style={[s.chip, themeName === name && s.chipActive]}><Txt style={s.chipText}>{name}</Txt></Pressable>)}</View>
-              <Txt style={s.fieldLabel}>انتخاب فونت</Txt>
-              <View style={s.chips}>{['پیش‌فرض','سریف','تک‌فاصله'].map(name => <Pressable key={name} onPress={() => saveAppearance('font', name)} style={[s.chip, fontName === name && s.chipActive]}><Txt style={s.chipText}>{name}</Txt></Pressable>)}</View>
-              <Txt style={s.fieldLabel}>اندازه نوشته</Txt>
-              <View style={s.actionRow}>{[{v:0.9,t:'کوچک'},{v:1,t:'معمولی'},{v:1.12,t:'بزرگ'}].map(x => <Pressable key={x.v} style={[s.chip, fontScale === x.v && s.chipActive]} onPress={() => saveAppearance('scale', x.v)}><Txt style={s.chipText}>{x.t}</Txt></Pressable>)}</View>
-            </View>
-
-            <View style={s.card}>
-              <Txt style={s.cardTitle}>ارتباط و اشتراک‌گذاری</Txt>
-              <Txt style={s.muted}>{contactText || 'اطلاعات تماس هنوز توسط مدیر ثبت نشده است.'}</Txt>
-              <Pressable style={s.secondary} onPress={() => Alert.alert('ارتباط با ما', contactText || 'اطلاعات تماس ثبت نشده است.')}><Txt style={s.secondaryText}>ارتباط با ما</Txt></Pressable>
-              <Pressable style={s.secondary} onPress={shareApp}><Txt style={s.secondaryText}>اشتراک‌گذاری برنامه</Txt></Pressable>
-            </View>
-
-            {isAdmin && <View style={s.card}>
-              <Txt style={s.cardTitle}>مدیریت مخصوص مدیر اصلی</Txt>
-              <Pressable style={s.adminButton} onPress={() => openAdminPage('users')}><Txt style={s.adminText}>ساخت کاربر و فهرست کاربران  ←</Txt></Pressable>
-              <Pressable style={s.adminButton} onPress={() => openAdminPage('deleted')}><Txt style={s.adminText}>سوابق حذف‌شده‌ها  ←</Txt></Pressable>
-              <Pressable style={s.adminButton} onPress={() => openAdminPage('reports')}><Txt style={s.adminText}>گزارش و فاکتور جداگانه کاربران  ←</Txt></Pressable>
-              <Txt style={s.fieldLabel}>اطلاعات ارتباط با ما (قابل تنظیم توسط مدیر)</Txt>
-              <TextInput style={[s.input, s.multiline]} multiline value={contactEdit} onChangeText={setContactEdit} placeholder="شماره تماس یا راه ارتباطی" placeholderTextColor={theme.muted} />
-              <Pressable style={s.secondary} onPress={saveContact} disabled={busy}><Txt style={s.secondaryText}>ذخیره اطلاعات تماس</Txt></Pressable>
-            </View>}
-            <Pressable style={s.cancel} onPress={() => supabase.auth.signOut()}><Txt style={s.danger}>خروج از حساب</Txt></Pressable>
           </ScrollView>
         )}
 
-        {tab === 'settings' && adminPage === 'users' && isAdmin && (
+        {tab === 'settings' && settingsPage === 'theme' && !adminPage && (
           <ScrollView contentContainerStyle={s.form}>
-            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setAdminPage('')}><Txt style={s.backText}>←</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
+            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setSettingsPage('')}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
+            <Txt style={s.sectionTitle}>تم و رنگ برنامه</Txt>
+            <Txt style={s.muted}>رنگ دلخواه برنامه را انتخاب کنید.</Txt>
+            <View style={s.card}><View style={s.chips}>{Object.keys(palettes).map(name => <Pressable key={name} onPress={() => saveAppearance('theme', name)} style={[s.chip, themeName === name && s.chipActive]}><Txt style={s.chipText}>{name}</Txt></Pressable>)}</View></View>
+          </ScrollView>
+        )}
+
+        {tab === 'settings' && settingsPage === 'font' && !adminPage && (
+          <ScrollView contentContainerStyle={s.form}>
+            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setSettingsPage('')}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
+            <Txt style={s.sectionTitle}>فونت برنامه</Txt>
+            <View style={s.card}><View style={s.chips}>{['پیش‌فرض','سریف','تک‌فاصله'].map(name => <Pressable key={name} onPress={() => saveAppearance('font', name)} style={[s.chip, fontName === name && s.chipActive]}><Txt style={s.chipText}>{name}</Txt></Pressable>)}</View></View>
+          </ScrollView>
+        )}
+
+        {tab === 'settings' && settingsPage === 'scale' && !adminPage && (
+          <ScrollView contentContainerStyle={s.form}>
+            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setSettingsPage('')}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
+            <Txt style={s.sectionTitle}>اندازه نوشته</Txt>
+            <View style={s.card}><View style={s.actionRow}>{[{v:0.9,t:'کوچک'},{v:1,t:'معمولی'},{v:1.12,t:'بزرگ'}].map(x => <Pressable key={x.v} style={[s.chip, fontScale === x.v && s.chipActive]} onPress={() => saveAppearance('scale', x.v)}><Txt style={s.chipText}>{x.t}</Txt></Pressable>)}</View></View>
+          </ScrollView>
+        )}
+
+        {tab === 'settings' && settingsPage === 'contact' && !adminPage && (
+          <ScrollView contentContainerStyle={s.form}>
+            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setSettingsPage('')}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
+            <Txt style={s.sectionTitle}>ارتباط با ما و اشتراک‌گذاری</Txt>
+            <View style={s.card}>
+              <Txt style={s.muted}>{contactText || 'اطلاعات تماس هنوز توسط مدیر ثبت نشده است.'}</Txt>
+              <Pressable style={s.secondary} onPress={() => Alert.alert('ارتباط با ما', contactText || 'اطلاعات تماس ثبت نشده است.')}><Txt style={s.secondaryText}>مشاهده اطلاعات تماس</Txt></Pressable>
+              {isAdmin && <>
+                <Txt style={s.fieldLabel}>ویرایش اطلاعات ارتباط با ما</Txt>
+                <TextInput style={[s.input, s.multiline]} multiline value={contactEdit} onChangeText={setContactEdit} placeholder="شماره تماس یا راه ارتباطی" placeholderTextColor={theme.muted} />
+                <Pressable style={s.primary} onPress={saveContact} disabled={busy}><Txt style={s.primaryText}>ذخیره اطلاعات تماس</Txt></Pressable>
+              </>}
+            </View>
+            <Pressable style={s.secondary} onPress={shareApp}><Txt style={s.secondaryText}>اشتراک‌گذاری برنامه</Txt></Pressable>
+          </ScrollView>
+        )}
+
+        {tab === 'settings' && settingsPage === 'admin' && !adminPage && isAdmin && (
+          <ScrollView contentContainerStyle={s.form}>
+            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setSettingsPage('')}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
+            <Txt style={s.sectionTitle}>مدیریت برنامه</Txt>
+            <Pressable style={s.settingsRow} onPress={() => openAdminPage('users')}><View style={s.settingsRowText}><Txt style={s.cardTitle}>کاربران و دسته‌بندی‌ها</Txt><Txt style={s.muted}>ساخت و مشاهده کاربران و مدیریت دسته‌ها</Txt></View><Txt style={s.settingsArrow}>‹</Txt></Pressable>
+            <Pressable style={s.settingsRow} onPress={() => openAdminPage('deleted')}><View style={s.settingsRowText}><Txt style={s.cardTitle}>سوابق حذف و تغییرات</Txt><Txt style={s.muted}>مشاهده تاریخچه عملیات هزینه‌ها</Txt></View><Txt style={s.settingsArrow}>‹</Txt></Pressable>
+            <Pressable style={s.settingsRow} onPress={() => openAdminPage('reports')}><View style={s.settingsRowText}><Txt style={s.cardTitle}>گزارش و فاکتور کاربران</Txt><Txt style={s.muted}>گزارش جداگانه هر کاربر در بازه دلخواه</Txt></View><Txt style={s.settingsArrow}>‹</Txt></Pressable>
+          </ScrollView>
+        )}
+
+        {tab === 'settings' && settingsPage === 'admin' && adminPage === 'users' && isAdmin && (
+          <ScrollView contentContainerStyle={s.form}>
+            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => { setAdminPage(''); setSettingsPage('admin'); }}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
             <Txt style={s.sectionTitle}>ساخت کاربر جدید</Txt>
             <TextInput style={s.input} placeholder="نام نمایشی (اختیاری)" placeholderTextColor={theme.muted} value={newDisplayName} onChangeText={setNewDisplayName} />
             <TextInput style={s.input} placeholder="نام کاربری انگلیسی" placeholderTextColor={theme.muted} autoCapitalize="none" value={newUsername} onChangeText={setNewUsername} />
@@ -452,9 +504,9 @@ export default function App() {
           </ScrollView>
         )}
 
-        {tab === 'settings' && adminPage === 'deleted' && isAdmin && (
+        {tab === 'settings' && settingsPage === 'admin' && adminPage === 'deleted' && isAdmin && (
           <ScrollView contentContainerStyle={s.form}>
-            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setAdminPage('')}><Txt style={s.backText}>←</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
+            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => { setAdminPage(''); setSettingsPage('admin'); }}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
             <Txt style={s.sectionTitle}>سوابق حذف و تغییر هزینه‌ها</Txt>
             <Txt style={s.muted}>این سوابق از تاریخچه ثبت‌شده در دیتابیس خوانده می‌شوند.</Txt>
             {history.filter(x => x.action === 'deleted').length === 0 && <Txt style={s.empty}>مورد حذف‌شده‌ای ثبت نشده است.</Txt>}
@@ -471,9 +523,9 @@ export default function App() {
           </ScrollView>
         )}
 
-        {tab === 'settings' && adminPage === 'reports' && isAdmin && (
+        {tab === 'settings' && settingsPage === 'admin' && adminPage === 'reports' && isAdmin && (
           <ScrollView contentContainerStyle={s.form}>
-            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setAdminPage('')}><Txt style={s.backText}>←</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
+            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => { setAdminPage(''); setSettingsPage('admin'); }}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
             <Txt style={s.sectionTitle}>گزارش هزینه و فاکتور کاربران</Txt>
             <Txt style={s.fieldLabel}>از تاریخ (YYYY-MM-DD)</Txt>
             <TextInput style={s.input} value={reportFrom} onChangeText={setReportFrom} placeholder="شروع بازه" placeholderTextColor={theme.muted} />
@@ -493,7 +545,7 @@ export default function App() {
 
       <View style={s.bottomNav}>
         {[{id:'all',label:'هزینه‌ها',glyph:'▤'},{id:'add',label:'ثبت هزینه',glyph:'＋'},{id:'mine',label:'هزینه‌های شما',glyph:'◷'},{id:'settings',label:'تنظیمات',glyph:'⚙'}].map(item => (
-          <Pressable key={item.id} style={[s.navItem, tab === item.id && s.navActive]} onPress={() => { setTab(item.id); setAdminPage(''); if (item.id === 'add' && !editing) resetForm(); }}>
+          <Pressable key={item.id} style={[s.navItem, tab === item.id && s.navActive]} onPress={() => { setTab(item.id); setAdminPage(''); setSettingsPage(''); if (item.id === 'add' && !editing) resetForm(); }}>
             <Txt style={[s.navGlyph, tab === item.id && s.navSelected]}>{item.glyph}</Txt>
             <Txt style={[s.navLabel, tab === item.id && s.navSelected]}>{item.label}</Txt>
           </Pressable>
@@ -552,6 +604,9 @@ function makeStyles(t, fontFamily, fontScale) {
     totalCard: { backgroundColor: t.card, borderWidth: 1, borderColor: t.border, borderRadius: 15, padding: 18, marginVertical: 14 },
     total: { fontSize: 22, color: t.primary, fontWeight: '900', textAlign: 'right', marginVertical: 5, ...f },
     profileLine: { color: t.text, textAlign: 'right', marginVertical: 4, ...f },
+    settingsRow: { backgroundColor: t.card, borderWidth: 1, borderColor: t.border, borderRadius: 14, padding: 15, marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    settingsRowText: { flex: 1 },
+    settingsArrow: { color: t.primary, fontSize: 30, fontWeight: '700', marginLeft: 8 },
     adminButton: { padding: 14, backgroundColor: t.bg, borderRadius: 11, marginTop: 9 },
     adminText: { color: t.primary, fontWeight: '800', textAlign: 'right', ...f },
     subpageTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', marginBottom: 14 },
