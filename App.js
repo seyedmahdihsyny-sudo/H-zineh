@@ -21,7 +21,7 @@ const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tehran', 
 const dateText = value => value ? new Date(value + 'T12:00:00+03:30').toLocaleDateString('fa-IR', { timeZone: 'Asia/Tehran' }) : '—';
 const dateTimeText = value => value ? new Date(value).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran', dateStyle: 'medium', timeStyle: 'short' }) : '—';
 const palettes = {
-  سبز: { bg: '#f3f7f4', card: '#ffffff', primary: '#167d65', text: '#20352d', muted: '#78847f', border: '#e1eae4' },
+  سبز: { bg: '#eaf6f4', card: '#ffffff', primary: '#078577', text: '#142b35', muted: '#70838a', border: '#c9dfdc' },
   آبی: { bg: '#f2f5fa', card: '#ffffff', primary: '#315f9b', text: '#1d2c40', muted: '#718096', border: '#dce5f0' },
   بنفش: { bg: '#f6f3fa', card: '#ffffff', primary: '#7450a5', text: '#30243e', muted: '#82768f', border: '#e8e0ef' },
   تیره: { bg: '#111827', card: '#1f2937', primary: '#38b99a', text: '#f3f4f6', muted: '#aab4c2', border: '#374151' },
@@ -437,7 +437,7 @@ export default function App() {
 
         {tab === 'settings' && adminPage === 'users' && isAdmin && (
           <ScrollView contentContainerStyle={s.form}>
-            <Pressable onPress={() => setAdminPage('')}><Txt style={s.link}>← بازگشت به تنظیمات</Txt></Pressable>
+            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setAdminPage('')}><Txt style={s.backText}>←</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
             <Txt style={s.sectionTitle}>ساخت کاربر جدید</Txt>
             <TextInput style={s.input} placeholder="نام نمایشی (اختیاری)" placeholderTextColor={theme.muted} value={newDisplayName} onChangeText={setNewDisplayName} />
             <TextInput style={s.input} placeholder="نام کاربری انگلیسی" placeholderTextColor={theme.muted} autoCapitalize="none" value={newUsername} onChangeText={setNewUsername} />
@@ -454,7 +454,7 @@ export default function App() {
 
         {tab === 'settings' && adminPage === 'deleted' && isAdmin && (
           <ScrollView contentContainerStyle={s.form}>
-            <Pressable onPress={() => setAdminPage('')}><Txt style={s.link}>← بازگشت به تنظیمات</Txt></Pressable>
+            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setAdminPage('')}><Txt style={s.backText}>←</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
             <Txt style={s.sectionTitle}>سوابق حذف و تغییر هزینه‌ها</Txt>
             <Txt style={s.muted}>این سوابق از تاریخچه ثبت‌شده در دیتابیس خوانده می‌شوند.</Txt>
             {history.filter(x => x.action === 'deleted').length === 0 && <Txt style={s.empty}>مورد حذف‌شده‌ای ثبت نشده است.</Txt>}
@@ -473,7 +473,7 @@ export default function App() {
 
         {tab === 'settings' && adminPage === 'reports' && isAdmin && (
           <ScrollView contentContainerStyle={s.form}>
-            <Pressable onPress={() => setAdminPage('')}><Txt style={s.link}>← بازگشت به تنظیمات</Txt></Pressable>
+            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setAdminPage('')}><Txt style={s.backText}>←</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
             <Txt style={s.sectionTitle}>گزارش هزینه و فاکتور کاربران</Txt>
             <Txt style={s.fieldLabel}>از تاریخ (YYYY-MM-DD)</Txt>
             <TextInput style={s.input} value={reportFrom} onChangeText={setReportFrom} placeholder="شروع بازه" placeholderTextColor={theme.muted} />
@@ -554,6 +554,10 @@ function makeStyles(t, fontFamily, fontScale) {
     profileLine: { color: t.text, textAlign: 'right', marginVertical: 4, ...f },
     adminButton: { padding: 14, backgroundColor: t.bg, borderRadius: 11, marginTop: 9 },
     adminText: { color: t.primary, fontWeight: '800', textAlign: 'right', ...f },
+    subpageTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', marginBottom: 14 },
+    backButton: { width: 42, height: 42, borderRadius: 13, backgroundColor: t.card, borderWidth: 1, borderColor: t.border, alignItems: 'center', justifyContent: 'center' },
+    backText: { color: t.primary, fontSize: 27, fontWeight: '900' },
+    subpageCaption: { color: t.muted, marginLeft: 10, fontSize: 12, ...f },
     bottomNav: { flexDirection: 'row', borderTopWidth: 1, borderColor: t.border, backgroundColor: t.card, paddingBottom: Platform.OS === 'android' ? 7 : 3, paddingTop: 8, minHeight: 72 },
     navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 7, borderRadius: 13, marginHorizontal: 3 },
     navActive: { backgroundColor: t.bg, borderTopWidth: 0, marginTop: 0, paddingTop: 7 },
