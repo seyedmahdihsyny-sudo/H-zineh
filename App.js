@@ -93,6 +93,16 @@ export default function App() {
     else { setProfile(null); setExpenses([]); }
   }, [session?.user?.id]);
 
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    const channel = supabase.channel('hzineh-live-notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, payload => {
+        setNotifications(current => [payload.new, ...current]);
+        Alert.alert('اطلاع‌رسانی', payload.new.message || 'هزینه جدید ثبت شد');
+      }).subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [session?.user?.id]);
+
   async function loadData() {
     const [er, cr, pr, prs, sr, nr] = await Promise.all([
       supabase.from('expenses').select('*, expense_categories(name)').order('expense_date', { ascending: false }).order('created_at', { ascending: false }),
