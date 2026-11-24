@@ -38,8 +38,6 @@ export default function App() {
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [history, setHistory] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState('all');
   const [adminPage, setAdminPage] = useState('');
@@ -93,24 +91,13 @@ export default function App() {
     else { setProfile(null); setExpenses([]); }
   }, [session?.user?.id]);
 
-  useEffect(() => {
-    if (!session?.user?.id) return;
-    const channel = supabase.channel('hzineh-live-notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, payload => {
-        setNotifications(current => [payload.new, ...current]);
-        Alert.alert('اطلاع‌رسانی', payload.new.message || 'هزینه جدید ثبت شد');
-      }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [session?.user?.id]);
-
   async function loadData() {
-    const [er, cr, pr, prs, sr, nr] = await Promise.all([
+    const [er, cr, pr, prs, sr] = await Promise.all([
       supabase.from('expenses').select('*, expense_categories(name)').order('expense_date', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('expense_categories').select('*').order('name'),
       supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle(),
       supabase.from('profiles').select('id,display_name,role,username').order('created_at'),
-      supabase.from('app_settings').select('key,value'),
-      supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(40)
+      supabase.from('app_settings').select('key,value')
     ]);
     if (er.error) Alert.alert('خطا در دریافت هزینه‌ها', er.error.message);
     else setExpenses(er.data || []);
@@ -124,7 +111,6 @@ export default function App() {
       const contact = (sr.data || []).find(x => x.key === 'contact_text')?.value || '';
       setContactText(contact); setContactEdit(contact);
     }
-    if (!nr.error) setNotifications(nr.data || []);
   }
 
   async function loadAdminHistory() {
@@ -233,13 +219,6 @@ export default function App() {
     if (result.error) return Alert.alert('خطا', result.error.message);
     setCategories(current => [...current, result.data]);
     setNewCategory('');
-  }
-
-  async function markRead(item) {
-    const result = await supabase.from('notification_reads').upsert({
-      notification_id: item.id, user_id: session.user.id
-    }, { onConflict: 'notification_id,user_id', ignoreDuplicates: true });
-    if (result.error) Alert.alert('خطا', result.error.message);
   }
 
   async function saveProfile() {
@@ -356,7 +335,7 @@ export default function App() {
       <StatusBar barStyle={themeName === 'تیره' || themeName === 'ذغالی' ? 'light-content' : 'dark-content'} />
       <View style={s.header}>
         <View><Txt style={s.brandSmall}>H-zineh</Txt><Txt style={s.muted}>مدیریت هزینه‌های کارخانه</Txt></View>
-        <View style={s.actionRow}><Pressable onPress={() => setNotificationsVisible(true)}><Txt style={s.link}>اعلان‌ها</Txt></Pressable><Pressable onPress={() => supabase.auth.signOut()}><Txt style={s.link}>خروج</Txt></Pressable></View>
+        <View style={s.actionRow}><Pressable onPress={() => supabase.auth.signOut()}><Txt style={s.link}>خروج</Txt></Pressable></View>
       </View>
 
       <View style={s.content}>
@@ -521,25 +500,9 @@ export default function App() {
         ))}
       </View>
 
-      <Modal visible={notificationsVisible} transparent animationType="slide" onRequestClose={() => setNotificationsVisible(false)}>
-        <View style={s.previewBackdrop}>
-          <View style={[s.card, { width: '100%', maxHeight: '78%' }]}>
-            <View style={s.cardRow}><Txt style={s.cardTitle}>اعلان‌ها</Txt><Pressable onPress={() => setNotificationsVisible(false)}><Txt style={s.danger}>بستن ×</Txt></Pressable></View>
-            <ScrollView>
-              {notifications.length === 0 && <Txt style={s.empty}>اعلانی وجود ندارد.</Txt>}
-              {notifications.map(item => <Pressable key={item.id} style={s.card} onPress={() => markRead(item)}>
-                <Txt style={s.cardTitle}>{item.message}</Txt>
-                <Txt style={s.muted}>{dateTimeText(item.created_at)}</Txt>
-                <Txt style={s.link}>علامت‌گذاری به‌عنوان خوانده‌شده</Txt>
-              </Pressable>)}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
       <Modal visible={previewVisible} transparent animationType="fade" onRequestClose={() => setPreviewVisible(false)}>
         <View style={s.previewBackdrop}>
-          <Pressable style={s.previewCloseTop} onPress={() => setPreviewVisible(false)}><Txt style={s.previewCloseText}>×</Txt></Pressable>
+          <Pressable style={s.previewCloseTop} onPress={() => setPreviewVisible(false)}><Txt style={s.previewCloseText}>←</Txt></Pressable>
           {(invoice || invoiceUrl) && <Image source={{ uri: invoice?.uri || invoiceUrl }} style={s.fullInvoice} />}
         </View>
       </Modal>
@@ -591,15 +554,15 @@ function makeStyles(t, fontFamily, fontScale) {
     profileLine: { color: t.text, textAlign: 'right', marginVertical: 4, ...f },
     adminButton: { padding: 14, backgroundColor: t.bg, borderRadius: 11, marginTop: 9 },
     adminText: { color: t.primary, fontWeight: '800', textAlign: 'right', ...f },
-    bottomNav: { flexDirection: 'row', borderTopWidth: 1, borderColor: t.border, backgroundColor: t.card, paddingBottom: Platform.OS === 'android' ? 5 : 2, paddingTop: 7 },
-    navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 4 },
-    navActive: { borderTopWidth: 2, borderColor: t.primary, marginTop: -8, paddingTop: 7 },
+    bottomNav: { flexDirection: 'row', borderTopWidth: 1, borderColor: t.border, backgroundColor: t.card, paddingBottom: Platform.OS === 'android' ? 7 : 3, paddingTop: 8, minHeight: 72 },
+    navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 7, borderRadius: 13, marginHorizontal: 3 },
+    navActive: { backgroundColor: t.bg, borderTopWidth: 0, marginTop: 0, paddingTop: 7 },
     navGlyph: { fontSize: 20, color: t.muted, ...f },
     navLabel: { fontSize: 10, color: t.muted, marginTop: 2, ...f },
     navSelected: { color: t.primary, fontWeight: '900' },
     previewBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.96)', alignItems: 'center', justifyContent: 'center', padding: 18 },
-    previewCloseTop: { position: 'absolute', top: 48, right: 20, zIndex: 5, width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-    previewCloseText: { color: '#172b25', fontSize: 32, lineHeight: 36, fontWeight: '700' },
+    previewCloseTop: { position: 'absolute', top: 48, right: 20, zIndex: 5, width: 46, height: 46, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+    previewCloseText: { color: '#172b25', fontSize: 27, lineHeight: 32, fontWeight: '900' },
     fullInvoice: { width: '100%', height: '80%', resizeMode: 'contain' }
   });
 }
