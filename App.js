@@ -182,6 +182,13 @@ function AppContent() {
   const [fontName, setFontName] = useState('پیش‌فرض');
   const [fontScale, setFontScale] = useState(1);
   const [newCategory, setNewCategory] = useState('');
+  const [releaseVersion, setReleaseVersion] = useState('');
+  const [releaseVersionEdit, setReleaseVersionEdit] = useState('');
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [releaseNotes, setReleaseNotes] = useState('');
+  const [releaseNotesEdit, setReleaseNotesEdit] = useState('');
+  const currentAppVersion = '1.0.0';
+  const apkDownloadUrl = 'https://github.com/seyedmahdihsyny-sudo/H-zineh/releases/latest/download/H-zineh.apk';
 
   const theme = palettes[themeName] || palettes.سبز;
   const fontFamily = fontName === 'سریف' ? 'serif' : fontName === 'تک‌فاصله' ? 'monospace' : undefined;
@@ -226,6 +233,11 @@ function AppContent() {
     if (!sr.error) {
       const contact = (sr.data || []).find(x => x.key === 'contact_text')?.value || '';
       setContactText(contact); setContactEdit(contact);
+      const version = (sr.data || []).find(x => x.key === 'release_version')?.value || '';
+      const notes = (sr.data || []).find(x => x.key === 'release_notes')?.value || '';
+      setReleaseVersion(version); setReleaseVersionEdit(version);
+      setReleaseNotes(notes); setReleaseNotesEdit(notes);
+      setUpdateAvailable(!!version && version !== currentAppVersion);
     }
   }
 
@@ -438,6 +450,29 @@ function AppContent() {
     setContactText(contactEdit.trim()); Alert.alert('ذخیره شد', 'اطلاعات ارتباط با ما به‌روزرسانی شد.');
   }
 
+  async function saveReleaseInfo() {
+    const version = releaseVersionEdit.trim();
+    if (!/^\\d+\\.\\d+\\.\\d+$/.test(version)) {
+      return Alert.alert('نسخه نامعتبر', 'شماره نسخه را با قالب 1.0.1 وارد کنید.');
+    }
+    setBusy(true);
+    const rows = [
+      { key: 'release_version', value: version, updated_by: session.user.id },
+      { key: 'release_notes', value: releaseNotesEdit.trim(), updated_by: session.user.id }
+    ];
+    const result = await supabase.from('app_settings').upsert(rows, { onConflict: 'key' });
+    setBusy(false);
+    if (result.error) return Alert.alert('خطا', result.error.message);
+    setReleaseVersion(version); setReleaseNotes(releaseNotesEdit.trim());
+    setUpdateAvailable(version !== currentAppVersion);
+    Alert.alert('ذخیره شد', 'اطلاعات نسخه جدید برای کاربران ثبت شد.');
+  }
+
+  async function downloadLatestApk() {
+    try { await Linking.openURL(apkDownloadUrl); }
+    catch { Alert.alert('خطا', 'باز کردن لینک دانلود ممکن نشد.'); }
+  }
+
   async function saveAppearance(key, value) {
     if (key === 'theme') setThemeName(value);
     if (key === 'font') setFontName(value);
@@ -637,6 +672,12 @@ function AppContent() {
         {tab === 'settings' && !adminPage && !settingsPage && (
           <ScrollView contentContainerStyle={s.form}>
             <Txt style={s.sectionTitle}>تنظیمات</Txt>
+            {updateAvailable && <View style={[s.card,{borderWidth:1,borderColor:theme.primary}]}>
+              <Txt style={s.cardTitle}>به‌روزرسانی در دسترس است</Txt>
+              <Txt style={s.muted}>نسخه {releaseVersion} آماده دریافت است.</Txt>
+              {!!releaseNotes && <Txt style={s.description}>{releaseNotes}</Txt>}
+              <Pressable style={s.primary} onPress={downloadLatestApk}><Txt style={s.primaryText}>دریافت نسخه جدید</Txt></Pressable>
+            </View>}
             <Pressable style={s.settingsRow} onPress={() => setSettingsPage('profile')}>
               <View style={s.settingsRowText}><Txt style={s.cardTitle}>حساب کاربری</Txt><Txt style={s.muted}>اطلاعات حساب و تغییر رمز عبور</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
             </Pressable>
@@ -709,6 +750,14 @@ function AppContent() {
           <ScrollView contentContainerStyle={s.form}>
             <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setSettingsPage('')}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
             <Txt style={s.sectionTitle}>مدیریت برنامه</Txt>
+            <View style={s.card}>
+              <Txt style={s.cardTitle}>انتشار به‌روزرسانی</Txt>
+              <Txt style={s.muted}>شماره نسخه جدید و توضیحات را وارد کنید. فایل APK باید در GitHub Release با نام H-zineh.apk قرار گرفته باشد.</Txt>
+              <TextInput style={s.input} value={releaseVersionEdit} onChangeText={setReleaseVersionEdit} placeholder="مثلاً 1.0.1" placeholderTextColor={theme.muted} autoCapitalize="none" />
+              <TextInput style={[s.input,s.multiline]} value={releaseNotesEdit} onChangeText={setReleaseNotesEdit} placeholder="توضیحات نسخه (اختیاری)" placeholderTextColor={theme.muted} multiline />
+              <Pressable style={s.primary} onPress={saveReleaseInfo} disabled={busy}><Txt style={s.primaryText}>{busy ? 'در حال ذخیره…' : 'اعلان نسخه جدید به کاربران'}</Txt></Pressable>
+              <Pressable style={s.secondary} onPress={downloadLatestApk}><Txt style={s.secondaryText}>آزمایش لینک دانلود مستقیم</Txt></Pressable>
+            </View>
             <Pressable style={s.settingsRow} onPress={() => openAdminPage('users')}><View style={s.settingsRowText}><Txt style={s.cardTitle}>کاربران و دسته‌بندی‌ها</Txt><Txt style={s.muted}>ساخت و مشاهده کاربران و مدیریت دسته‌ها</Txt></View><Txt style={s.settingsArrow}>‹</Txt></Pressable>
             <Pressable style={s.settingsRow} onPress={() => openAdminPage('deleted')}><View style={s.settingsRowText}><Txt style={s.cardTitle}>سوابق حذف و تغییرات</Txt><Txt style={s.muted}>مشاهده تاریخچه عملیات هزینه‌ها</Txt></View><Txt style={s.settingsArrow}>‹</Txt></Pressable>
             <Pressable style={s.settingsRow} onPress={() => openAdminPage('reports')}><View style={s.settingsRowText}><Txt style={s.cardTitle}>گزارش و فاکتور کاربران</Txt><Txt style={s.muted}>گزارش جداگانه هر کاربر در بازه دلخواه</Txt></View><Txt style={s.settingsArrow}>‹</Txt></Pressable>
