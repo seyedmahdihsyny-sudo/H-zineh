@@ -44,6 +44,9 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
 
+      - name: Rename APK for direct download
+        run: cp android/app/build/outputs/apk/release/app-release.apk H-zineh.apk
+
       - name: Publish APK as the latest GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -52,6 +55,6 @@ jobs:
           body: |
             Automated Android APK build from commit ${{ github.sha }}.
             Download H-zineh.apk below.
-          files: android/app/build/outputs/apk/release/app-release.apk
+          files: H-zineh.apk
           make_latest: true
           fail_on_unmatched_files: true
