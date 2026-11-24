@@ -610,7 +610,7 @@ function AppContent() {
     </SafeAreaView>
   );
 
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = String(profile?.role || '').trim().toLowerCase() === 'admin';
   const activeLabel = tab === 'all' ? 'هزینه‌ها' : tab === 'add' ? 'ثبت هزینه' : tab === 'mine' ? 'هزینه‌های شما' : 'تنظیمات';
 
   return (
