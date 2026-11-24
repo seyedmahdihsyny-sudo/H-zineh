@@ -278,7 +278,6 @@ function AppContent() {
     if (!result.canceled && result.assets?.[0]) {
       const asset = result.assets[0];
       if (!asset.base64) return Alert.alert('خطای تصویر', 'خواندن اطلاعات تصویر از گوشی انجام نشد. لطفاً تصویر دیگری انتخاب کنید.');
-      if (asset.fileSize && asset.fileSize > 10 * 1024 * 1024) return Alert.alert('حجم زیاد تصویر', 'حجم تصویر باید کمتر از ۱۰ مگابایت باشد.');
       setInvoice(asset);
     }
   }
@@ -299,7 +298,7 @@ function AppContent() {
         const path = session.user.id + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + extension;
         const arrayBuffer = decodeBase64ToArrayBuffer(invoice.base64);
         if (!arrayBuffer || arrayBuffer.byteLength === 0) throw new Error('محتوای تصویر خالی است؛ لطفاً دوباره انتخاب کنید.');
-        if (arrayBuffer.byteLength > 10 * 1024 * 1024) throw new Error('حجم تصویر بیشتر از ۱۰ مگابایت است.');
+        if (arrayBuffer.byteLength > 20 * 1024 * 1024) throw new Error('حجم تصویر بیشتر از ۲۰ مگابایت است.');
         const upload = await supabase.storage.from('invoices').upload(path, arrayBuffer, {
           contentType: mime, upsert: false, cacheControl: '3600'
         });
