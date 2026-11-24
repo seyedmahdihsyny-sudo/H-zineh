@@ -324,7 +324,10 @@ function AppContent() {
         const arrayBuffer = decodeBase64ToArrayBuffer(invoice.base64);
         if (!arrayBuffer || arrayBuffer.byteLength === 0) throw new Error('محتوای تصویر خالی است؛ لطفاً دوباره انتخاب کنید.');
         if (arrayBuffer.byteLength > 20 * 1024 * 1024) throw new Error('حجم تصویر بیشتر از ۲۰ مگابایت است.');
-        const upload = await supabase.storage.from('invoices').upload(path, arrayBuffer, {
+        // React Native may label a raw ArrayBuffer as text/plain in multipart uploads.
+        // Wrap the bytes in a typed Blob so Storage receives the actual JPEG MIME type.
+        const imageBlob = new Blob([new Uint8Array(arrayBuffer)], { type: mime });
+        const upload = await supabase.storage.from('invoices').upload(path, imageBlob, {
           contentType: mime, upsert: false, cacheControl: '3600'
         });
         if (upload.error) throw new Error('ذخیره تصویر در فضای ابری ناموفق بود: ' + upload.error.message);
