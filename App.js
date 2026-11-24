@@ -137,15 +137,22 @@ function AppContent() {
   async function createPartner() {
     if (!newUsername.trim() || !newPassword || newPassword.length < 8) return Alert.alert('اطلاعات ناقص', 'نام کاربری و رمز حداقل ۸ کاراکتری وارد کنید.');
     setBusy(true);
-    const { data: { session: current } } = await supabase.auth.getSession();
-    const result = await supabase.functions.invoke('admin-create-user', {
-      body: { username: newUsername.trim().toLowerCase(), password: newPassword, display_name: newDisplayName.trim() },
-      headers: { Authorization: 'Bearer ' + current.access_token }
-    });
-    setBusy(false);
-    if (result.error) return Alert.alert('ساخت کاربر ناموفق', result.data?.error || result.error.message);
-    setNewUsername(''); setNewPassword(''); setNewDisplayName('');
-    Alert.alert('انجام شد', 'حساب کاربر ساخته شد.'); loadData();
+    try {
+      const { data: { session: current }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !current?.access_token) throw new Error(sessionError?.message || 'نشست ورود معتبر نیست؛ دوباره وارد شوید.');
+      const result = await supabase.functions.invoke('admin-create-user', {
+        body: { username: newUsername.trim().toLowerCase(), password: newPassword, display_name: newDisplayName.trim() },
+        headers: { Authorization: 'Bearer ' + current.access_token }
+      });
+      if (result.error || result.data?.error) throw new Error(result.data?.error || result.error?.message || 'ساخت کاربر انجام نشد.');
+      setNewUsername(''); setNewPassword(''); setNewDisplayName('');
+      Alert.alert('انجام شد', 'حساب کاربر ساخته شد.');
+      await loadData();
+    } catch (e) {
+      Alert.alert('ساخت کاربر ناموفق', e?.message || 'خطای ناشناخته');
+    } finally {
+      setBusy(false);
+    }
   }
 
   function resetForm() {
@@ -163,34 +170,40 @@ function AppContent() {
   }
 
   async function saveExpense() {
-    const numericAmount = Number(amount.replace(/[,،٬\s]/g, ''));
+    const numericAmount = Number(String(amount).replace(/[,،٬\s]/g, ''));
     if (!title.trim() || !Number.isFinite(numericAmount) || numericAmount <= 0) return Alert.alert('اطلاعات ناقص', 'عنوان و مبلغ معتبر را وارد کنید.');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(expenseDate)) return Alert.alert('تاریخ نامعتبر', 'تاریخ را به شکل 2026-11-24 وارد کنید.');
     setBusy(true);
-    let invoicePath = editing?.invoice_path || null;
-    if (invoice) {
-      const extension = (invoice.fileName || invoice.uri.split('.').pop() || 'jpg').split('.').pop().toLowerCase();
-      const path = session.user.id + '/' + Date.now() + '.' + (['jpg','jpeg','png','webp','heic','heif'].includes(extension) ? extension : 'jpg');
-      try {
+    try {
+      let invoicePath = editing?.invoice_path || null;
+      if (invoice) {
+        const extension = (invoice.fileName || invoice.uri.split('.').pop() || 'jpg').split('.').pop().toLowerCase();
+        const path = session.user.id + '/' + Date.now() + '.' + (['jpg','jpeg','png','webp','heic','heif'].includes(extension) ? extension : 'jpg');
         const response = await fetch(invoice.uri);
+        if (!response.ok) throw new Error('خواندن تصویر فاکتور ناموفق بود.');
         const arrayBuffer = await response.arrayBuffer();
         const mime = invoice.mimeType || (extension === 'png' ? 'image/png' : 'image/jpeg');
         const upload = await supabase.storage.from('invoices').upload(path, arrayBuffer, { contentType: mime, upsert: false });
-        if (upload.error) { setBusy(false); return Alert.alert('خطای فاکتور', upload.error.message); }
-      } catch (e) { setBusy(false); return Alert.alert('خطای فاکتور', e?.message || 'بارگذاری تصویر انجام نشد.'); }
-      invoicePath = path;
+        if (upload.error) throw upload.error;
+        invoicePath = path;
+      }
+      const payload = {
+        title: title.trim(), amount: numericAmount,
+        expense_date: editing ? editing.expense_date : today(),
+        category_id: categoryId || null, partner_id: session.user.id,
+        created_by: session.user.id, description: description.trim(), invoice_path: invoicePath
+      };
+      const result = editing
+        ? await supabase.from('expenses').update(payload).eq('id', editing.id)
+        : await supabase.from('expenses').insert(payload);
+      if (result.error) throw result.error;
+      resetForm();
+      await loadData();
+      Alert.alert('ثبت شد', 'هزینه با موفقیت ذخیره شد.');
+    } catch (e) {
+      Alert.alert('ذخیره ناموفق', e?.message || 'خطای ناشناخته در ثبت هزینه');
+    } finally {
+      setBusy(false);
     }
-    const payload = {
-      title: title.trim(), amount: numericAmount, expense_date: editing ? editing.expense_date : automaticExpenseDate,
-      category_id: categoryId || null, partner_id: session.user.id,
-      created_by: session.user.id, description: description.trim(), invoice_path: invoicePath
-    };
-    const result = editing
-      ? await supabase.from('expenses').update(payload).eq('id', editing.id)
-      : await supabase.from('expenses').insert(payload);
-    setBusy(false);
-    if (result.error) return Alert.alert('ذخیره ناموفق', result.error.message);
-    resetForm(); loadData();
   }
 
   async function editExpense(item) {
