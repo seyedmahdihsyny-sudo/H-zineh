@@ -55,6 +55,68 @@ const palettes = {
   ذغالی: { bg: '#181818', card: '#252525', primary: '#e0a84b', text: '#f4f4f4', muted: '#b0b0b0', border: '#414141' }
 };
 
+
+const jalaliMonths = ['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+function getJalaliParts(value) {
+  const source = value || today();
+  const parts = new Intl.DateTimeFormat('en-u-ca-persian', { timeZone:'Asia/Tehran', year:'numeric', month:'numeric', day:'numeric' }).formatToParts(new Date(source + 'T12:00:00+03:30'));
+  const get = type => Number(parts.find(p => p.type === type)?.value || 1);
+  return { year:get('year'), month:get('month'), day:get('day') };
+}
+function jalaliMonthLength(year, month) {
+  if (month <= 6) return 31;
+  if (month <= 11) return 30;
+  const candidate = jalaliToGregorian(String(year) + '/12/30');
+  return candidate && jalaliInput(candidate).startsWith(String(year)) ? 30 : 29;
+}
+function JalaliDatePicker({ label, value, onChange, theme, styles, Txt }) {
+  const [opened, setOpened] = useState('');
+  const parts = getJalaliParts(value);
+  const years = Array.from({ length: 26 }, (_, i) => parts.year - 15 + i);
+  const days = Array.from({ length: jalaliMonthLength(parts.year, parts.month) }, (_, i) => i + 1);
+  const options = opened === 'year' ? years : opened === 'month' ? jalaliMonths.map((name, i) => ({ label:name, value:i + 1 })) : days;
+  const selected = opened === 'year' ? parts.year : opened === 'month' ? parts.month : parts.day;
+  function choose(next) {
+    const year = opened === 'year' ? next : parts.year;
+    const month = opened === 'month' ? next : parts.month;
+    const day = Math.min(opened === 'day' ? next : parts.day, jalaliMonthLength(year, month));
+    const iso = jalaliToGregorian(String(year) + '/' + String(month).padStart(2,'0') + '/' + String(day).padStart(2,'0'));
+    if (iso) onChange(iso);
+    setOpened('');
+  }
+  const display = value ? { year:parts.year, month:jalaliMonths[parts.month - 1], day:parts.day } : { year:'سال', month:'ماه', day:'روز' };
+  return <View>
+    <Txt style={styles.fieldLabel}>{label}</Txt>
+    <View style={{ flexDirection:'row', gap:8, marginTop:8 }}>
+      {[
+        { key:'day', text:display.day },
+        { key:'month', text:display.month },
+        { key:'year', text:display.year }
+      ].map(item => <Pressable key={item.key} onPress={() => setOpened(item.key)} style={{ flex:1, minHeight:48, paddingHorizontal:8, borderWidth:1, borderColor:theme.border, borderRadius:12, backgroundColor:theme.card, alignItems:'center', justifyContent:'center', flexDirection:'row', gap:5 }}>
+        <Txt style={{ color:theme.text, fontWeight:'700' }}>{item.text}</Txt>
+        <Txt style={{ color:theme.muted, fontSize:11 }}>⌄</Txt>
+      </Pressable>)}
+    </View>
+    <Modal visible={!!opened} transparent animationType="fade" onRequestClose={() => setOpened('')}>
+      <Pressable onPress={() => setOpened('')} style={{ flex:1, backgroundColor:'rgba(0,0,0,0.45)', justifyContent:'center', padding:28 }}>
+        <Pressable onPress={() => {}} style={{ backgroundColor:theme.card, borderRadius:16, padding:14, maxHeight:'70%' }}>
+          <Txt style={{ color:theme.text, fontSize:16, fontWeight:'900', textAlign:'right', marginBottom:10 }}>{opened === 'year' ? 'انتخاب سال' : opened === 'month' ? 'انتخاب ماه' : 'انتخاب روز'}</Txt>
+          <ScrollView>
+            {options.map(option => {
+              const val = typeof option === 'object' ? option.value : option;
+              const text = typeof option === 'object' ? option.label : String(option);
+              return <Pressable key={String(val)} onPress={() => choose(val)} style={{ padding:13, borderRadius:10, backgroundColor:val === selected ? theme.bg : 'transparent' }}>
+                <Txt style={{ color:val === selected ? theme.primary : theme.text, textAlign:'center', fontWeight:val === selected ? '900' : '500' }}>{text}</Txt>
+              </Pressable>;
+            })}
+          </ScrollView>
+          <Pressable onPress={() => setOpened('')} style={{ padding:12, alignItems:'center' }}><Txt style={{ color:theme.primary, fontWeight:'800' }}>بستن</Txt></Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  </View>;
+}
+
 export default function App() { return <SafeAreaProvider><AppContent /></SafeAreaProvider>; }
 
 function AppContent() {
@@ -362,6 +424,25 @@ function AppContent() {
     ]);
   }
 
+
+  async function deleteAllHistory() {
+    if (profile?.role !== 'admin') return Alert.alert('دسترسی محدود', 'فقط مدیر اصلی اجازه حذف تاریخچه را دارد.');
+    Alert.alert('حذف کل تاریخچه', 'تمام سوابق حذف و تغییرات پاک شوند؟ هزینه‌های اصلی دست‌نخورده باقی می‌مانند.', [
+      { text:'انصراف', style:'cancel' },
+      { text:'حذف همه سوابق', style:'destructive', onPress: async () => {
+        setBusy(true);
+        try {
+          const result = await supabase.from('expense_history').delete().gte('created_at', '1900-01-01T00:00:00Z');
+          if (result.error) throw result.error;
+          setHistory([]);
+          Alert.alert('انجام شد', 'تمام سوابق تاریخچه پاک شدند؛ هزینه‌های اصلی تغییری نکردند.');
+        } catch (e) {
+          Alert.alert('حذف ناموفق', e?.message || 'پاک کردن تاریخچه انجام نشد.');
+        } finally { setBusy(false); }
+      }}
+    ]);
+  }
+
   function historyTitle(item) {
     const data = item.old_data || item.new_data || {};
     const actor = profiles.find(p => p.id === item.actor_id);
@@ -455,10 +536,8 @@ function AppContent() {
           <ScrollView contentContainerStyle={s.form}>
             <Txt style={s.sectionTitle}>هزینه‌های ثبت‌شده شما</Txt>
             <Txt style={s.muted}>برای مشاهده مجموع هزینه در یک بازه، تاریخ شروع و پایان را وارد کنید.</Txt>
-            <Txt style={s.fieldLabel}>از تاریخ (YYYY-MM-DD)</Txt>
-            <TextInput style={s.input} placeholder="مثلاً 2026-11-01" placeholderTextColor={theme.muted} value={fromDate} onChangeText={setFromDate} />
-            <Txt style={s.fieldLabel}>تا تاریخ (YYYY-MM-DD)</Txt>
-            <TextInput style={s.input} placeholder="مثلاً 2026-11-30" placeholderTextColor={theme.muted} value={toDate} onChangeText={setToDate} />
+            <JalaliDatePicker label="از تاریخ" value={fromDate} onChange={setFromDate} theme={theme} styles={s} Txt={Txt} />
+            <JalaliDatePicker label="تا تاریخ" value={toDate} onChange={setToDate} theme={theme} styles={s} Txt={Txt} />
             <Pressable style={s.secondary} onPress={() => { setFromDate(''); setToDate(''); }}><Txt style={s.secondaryText}>پاک کردن فیلتر تاریخ</Txt></Pressable>
             <View style={s.totalCard}>
               <Txt style={s.muted}>جمع هزینه‌های این بازه</Txt>
@@ -572,6 +651,7 @@ function AppContent() {
             <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => { setAdminPage(''); setSettingsPage('admin'); }}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
             <Txt style={s.sectionTitle}>سوابق حذف و تغییر هزینه‌ها</Txt>
             <Txt style={s.muted}>این سوابق از تاریخچه ثبت‌شده در دیتابیس خوانده می‌شوند.</Txt>
+            <Pressable style={s.dangerButton} onPress={deleteAllHistory} disabled={busy}><Txt style={s.dangerText}>{busy ? 'در حال حذف…' : 'حذف همه تاریخچه'}</Txt></Pressable>
             {history.filter(x => x.action === 'deleted').length === 0 && <Txt style={s.empty}>مورد حذف‌شده‌ای ثبت نشده است.</Txt>}
             {history.filter(x => x.action === 'deleted').map(item => {
               const info = historyTitle(item);
@@ -595,10 +675,8 @@ function AppContent() {
             <View style={s.chips}>
               {[['today','امروز'],['yesterday','دیروز'],['7days','۷ روز اخیر'],['month','ماه جاری'],['lastMonth','ماه قبل'],['year','سال جاری'],['custom','بازه دلخواه']].map(([key,label]) => <Pressable key={key} style={[s.chip, reportPreset === key && s.chipActive]} onPress={() => applyReportPreset(key)}><Txt style={s.chipText}>{label}</Txt></Pressable>)}
             </View>
-            <Txt style={s.fieldLabel}>از تاریخ شمسی</Txt>
-            <TextInput style={s.input} value={jalaliInput(reportFrom)} onChangeText={v => { setReportFrom(jalaliToGregorian(v)); setReportPreset('custom'); }} placeholder="۱۴۰۵/۰۸/۰۱" placeholderTextColor={theme.muted} keyboardType="numeric" />
-            <Txt style={s.fieldLabel}>تا تاریخ شمسی</Txt>
-            <TextInput style={s.input} value={jalaliInput(reportTo)} onChangeText={v => { setReportTo(jalaliToGregorian(v)); setReportPreset('custom'); }} placeholder="۱۴۰۵/۰۸/۳۰" placeholderTextColor={theme.muted} keyboardType="numeric" />
+            <JalaliDatePicker label="از تاریخ" value={reportFrom} onChange={value => { setReportFrom(value); setReportPreset('custom'); }} theme={theme} styles={s} Txt={Txt} />
+            <JalaliDatePicker label="تا تاریخ" value={reportTo} onChange={value => { setReportTo(value); setReportPreset('custom'); }} theme={theme} styles={s} Txt={Txt} />
             <Pressable style={s.secondary} onPress={() => applyReportPreset('custom')}><Txt style={s.secondaryText}>پاک کردن فیلتر تاریخ</Txt></Pressable>
             <Txt style={s.fieldLabel}>انتخاب گزارش</Txt>
             <View style={s.chips}>
@@ -648,6 +726,8 @@ function makeStyles(t, fontFamily, fontScale) {
     secondaryText: { color: t.primary, fontWeight: '700', ...f },
     link: { color: t.primary, fontWeight: '700', textAlign: 'right', marginTop: 10, ...f },
     danger: { color: '#d34b4b', fontWeight: '700', ...f },
+    dangerButton: { borderWidth: 1, borderColor: '#d34b4b', borderRadius: 12, padding: 12, alignItems: 'center', marginTop: 10, marginBottom: 14 },
+    dangerText: { color: '#d34b4b', fontWeight: '800', ...f },
     list: { paddingHorizontal: 16, paddingBottom: 18 },
     listHeader: { paddingVertical: 12 },
     sectionTitle: { fontSize: 18, fontWeight: '900', color: t.text, textAlign: 'right', marginBottom: 8, ...f },
