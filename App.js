@@ -617,8 +617,7 @@ function AppContent() {
     <SafeAreaView style={s.screen} edges={['top','right','bottom','left']}>
       <StatusBar barStyle={themeName === 'تیره' || themeName === 'ذغالی' ? 'light-content' : 'dark-content'} />
       <View style={s.header}>
-        <View><Txt style={s.brandSmall}>H-zineh</Txt><Txt style={s.muted}>مدیریت هزینه‌های کارخانه</Txt></View>
-        <View style={s.actionRow}><Pressable onPress={() => supabase.auth.signOut()}><Txt style={s.link}>خروج</Txt></Pressable></View>
+        <Txt style={s.brandSmall}>H-zineh</Txt>
       </View>
 
       <View style={s.content}>
@@ -826,7 +825,10 @@ function AppContent() {
       <View style={s.bottomNav}>
         {[{id:'all',label:'هزینه‌ها',glyph:'▤'},{id:'add',label:'ثبت هزینه',glyph:'＋'},{id:'mine',label:'هزینه‌های شما',glyph:'◷'},{id:'settings',label:'تنظیمات',glyph:'⚙'}].map(item => (
           <Pressable key={item.id} style={[s.navItem, tab === item.id && s.navActive]} onPress={() => { setTab(item.id); setAdminPage(''); setSettingsPage(''); if (item.id === 'add' && !editing) resetForm(); }}>
-            <Txt style={[s.navGlyph, tab === item.id && s.navSelected]}>{item.glyph}</Txt>
+            <View style={{ position:'relative', alignItems:'center', justifyContent:'center' }}>
+              <Txt style={[s.navGlyph, tab === item.id && s.navSelected]}>{item.glyph}</Txt>
+              {item.id === 'settings' && updateAvailable && <View style={{ position:'absolute', top:0, right:-9, width:9, height:9, borderRadius:5, backgroundColor:'#e34b4b', borderWidth:1, borderColor:theme.card }} />}
+            </View>
             <Txt style={[s.navLabel, tab === item.id && s.navSelected]}>{item.label}</Txt>
           </Pressable>
         ))}
@@ -849,9 +851,9 @@ function makeStyles(t, fontFamily, fontScale) {
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: t.bg },
     authWrap: { flex: 1, justifyContent: 'center', padding: 24 },
     content: { flex: 1 },
-    header: { paddingHorizontal: 20, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    header: { paddingHorizontal: 20, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
     brand: { fontSize: 32, fontWeight: '900', color: t.primary, textAlign: 'center', marginBottom: 10, ...f },
-    brandSmall: { fontSize: 22, fontWeight: '900', color: t.primary, textAlign: 'right', ...f },
+    brandSmall: { fontSize: 26, fontWeight: '900', color: t.primary, textAlign: 'center', ...f },
     heading: { fontSize: 21, fontWeight: '800', color: t.text, textAlign: 'center', marginBottom: 8, ...f },
     muted: { color: t.muted, fontSize: 13, textAlign: 'right', marginVertical: 4, ...f },
     input: { backgroundColor: t.card, borderWidth: 1, borderColor: t.border, borderRadius: 13, paddingHorizontal: 14, paddingVertical: 13, marginTop: 10, textAlign: 'right', color: t.text, fontFamily, fontSize: 14 * fontScale },
