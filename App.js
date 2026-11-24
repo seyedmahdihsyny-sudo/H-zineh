@@ -2,9 +2,10 @@ import 'react-native-url-polyfill/auto';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Linking,
-  Platform, Pressable, SafeAreaView, ScrollView, Share, StatusBar, StyleSheet,
+  Platform, Pressable, ScrollView, Share, StatusBar, StyleSheet,
   Text, TextInput, View, Modal
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
@@ -28,7 +29,9 @@ const palettes = {
   ذغالی: { bg: '#181818', card: '#252525', primary: '#e0a84b', text: '#f4f4f4', muted: '#b0b0b0', border: '#414141' }
 };
 
-export default function App() {
+export default function App() { return <SafeAreaProvider><AppContent /></SafeAreaProvider>; }
+
+function AppContent() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [username, setUsername] = useState('');
@@ -315,7 +318,7 @@ export default function App() {
 
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color={theme.primary} /></View>;
   if (!session) return (
-    <SafeAreaView style={s.screen}>
+    <SafeAreaView style={s.screen} edges={['top','right','bottom','left']}>
       <StatusBar barStyle={themeName === 'تیره' || themeName === 'ذغالی' ? 'light-content' : 'dark-content'} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.authWrap}>
         <Txt style={s.brand}>H-zineh</Txt>
@@ -332,7 +335,7 @@ export default function App() {
   const activeLabel = tab === 'all' ? 'هزینه‌ها' : tab === 'add' ? 'ثبت هزینه' : tab === 'mine' ? 'هزینه‌های شما' : 'تنظیمات';
 
   return (
-    <SafeAreaView style={s.screen}>
+    <SafeAreaView style={s.screen} edges={['top','right','bottom','left']}>
       <StatusBar barStyle={themeName === 'تیره' || themeName === 'ذغالی' ? 'light-content' : 'dark-content'} />
       <View style={s.header}>
         <View><Txt style={s.brandSmall}>H-zineh</Txt><Txt style={s.muted}>مدیریت هزینه‌های کارخانه</Txt></View>
@@ -394,19 +397,13 @@ export default function App() {
           <ScrollView contentContainerStyle={s.form}>
             <Txt style={s.sectionTitle}>تنظیمات</Txt>
             <Pressable style={s.settingsRow} onPress={() => setSettingsPage('profile')}>
-              <View style={s.settingsRowText}><Txt style={s.cardTitle}>حساب کاربری</Txt><Txt style={s.muted}>نام نمایشی، اطلاعات حساب و تغییر رمز</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
+              <View style={s.settingsRowText}><Txt style={s.cardTitle}>حساب کاربری</Txt><Txt style={s.muted}>اطلاعات حساب و تغییر رمز عبور</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
             </Pressable>
             <Pressable style={s.settingsRow} onPress={() => setSettingsPage('theme')}>
-              <View style={s.settingsRowText}><Txt style={s.cardTitle}>تم و رنگ برنامه</Txt><Txt style={s.muted}>انتخاب رنگ و حالت روشن یا تیره</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
-            </Pressable>
-            <Pressable style={s.settingsRow} onPress={() => setSettingsPage('font')}>
-              <View style={s.settingsRowText}><Txt style={s.cardTitle}>فونت برنامه</Txt><Txt style={s.muted}>تغییر نوع نوشته‌ها</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
-            </Pressable>
-            <Pressable style={s.settingsRow} onPress={() => setSettingsPage('scale')}>
-              <View style={s.settingsRowText}><Txt style={s.cardTitle}>اندازه نوشته</Txt><Txt style={s.muted}>کوچک، معمولی یا بزرگ</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
+              <View style={s.settingsRowText}><Txt style={s.cardTitle}>تم و رنگ برنامه</Txt><Txt style={s.muted}>رنگ، حالت روشن و تیره، فونت و اندازه نوشته</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
             </Pressable>
             <Pressable style={s.settingsRow} onPress={() => setSettingsPage('contact')}>
-              <View style={s.settingsRowText}><Txt style={s.cardTitle}>ارتباط با ما و اشتراک‌گذاری</Txt><Txt style={s.muted}>اطلاعات تماس و معرفی برنامه</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
+              <View style={s.settingsRowText}><Txt style={s.cardTitle}>ارتباط با ما</Txt><Txt style={s.muted}>اطلاعات تماس و اشتراک‌گذاری برنامه</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
             </Pressable>
             {isAdmin && <Pressable style={s.settingsRow} onPress={() => setSettingsPage('admin')}>
               <View style={s.settingsRowText}><Txt style={s.cardTitle}>مدیریت برنامه</Txt><Txt style={s.muted}>کاربران، گزارش‌ها، دسته‌بندی‌ها و سوابق</Txt></View><Txt style={s.settingsArrow}>‹</Txt>
@@ -441,20 +438,8 @@ export default function App() {
             <Txt style={s.sectionTitle}>تم و رنگ برنامه</Txt>
             <Txt style={s.muted}>رنگ دلخواه برنامه را انتخاب کنید.</Txt>
             <View style={s.card}><View style={s.chips}>{Object.keys(palettes).map(name => <Pressable key={name} onPress={() => saveAppearance('theme', name)} style={[s.chip, themeName === name && s.chipActive]}><Txt style={s.chipText}>{name}</Txt></Pressable>)}</View></View>
-          </ScrollView>
-        )}
-
-        {tab === 'settings' && settingsPage === 'font' && !adminPage && (
-          <ScrollView contentContainerStyle={s.form}>
-            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setSettingsPage('')}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
             <Txt style={s.sectionTitle}>فونت برنامه</Txt>
             <View style={s.card}><View style={s.chips}>{['پیش‌فرض','سریف','تک‌فاصله'].map(name => <Pressable key={name} onPress={() => saveAppearance('font', name)} style={[s.chip, fontName === name && s.chipActive]}><Txt style={s.chipText}>{name}</Txt></Pressable>)}</View></View>
-          </ScrollView>
-        )}
-
-        {tab === 'settings' && settingsPage === 'scale' && !adminPage && (
-          <ScrollView contentContainerStyle={s.form}>
-            <View style={s.subpageTop}><Pressable style={s.backButton} onPress={() => setSettingsPage('')}><Txt style={s.backText}>→</Txt></Pressable><Txt style={s.subpageCaption}>بازگشت به تنظیمات</Txt></View>
             <Txt style={s.sectionTitle}>اندازه نوشته</Txt>
             <View style={s.card}><View style={s.actionRow}>{[{v:0.9,t:'کوچک'},{v:1,t:'معمولی'},{v:1.12,t:'بزرگ'}].map(x => <Pressable key={x.v} style={[s.chip, fontScale === x.v && s.chipActive]} onPress={() => saveAppearance('scale', x.v)}><Txt style={s.chipText}>{x.t}</Txt></Pressable>)}</View></View>
           </ScrollView>
@@ -593,7 +578,7 @@ function makeStyles(t, fontFamily, fontScale) {
     description: { color: t.muted, textAlign: 'right', marginTop: 8, ...f },
     actionRow: { flexDirection: 'row', gap: 12, alignItems: 'center', marginTop: 12 },
     empty: { textAlign: 'center', color: t.muted, marginTop: 35, ...f },
-    form: { padding: 16, paddingBottom: 26 },
+    form: { padding: 16, paddingBottom: 20 },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
     chip: { borderRadius: 20, paddingHorizontal: 13, paddingVertical: 9, backgroundColor: t.bg, borderWidth: 1, borderColor: t.border },
     chipActive: { backgroundColor: t.border, borderColor: t.primary },
@@ -613,7 +598,7 @@ function makeStyles(t, fontFamily, fontScale) {
     backButton: { width: 42, height: 42, borderRadius: 13, backgroundColor: t.card, borderWidth: 1, borderColor: t.border, alignItems: 'center', justifyContent: 'center' },
     backText: { color: t.primary, fontSize: 27, fontWeight: '900' },
     subpageCaption: { color: t.muted, marginLeft: 10, fontSize: 12, ...f },
-    bottomNav: { flexDirection: 'row', borderTopWidth: 1, borderColor: t.border, backgroundColor: t.card, paddingBottom: Platform.OS === 'android' ? 7 : 3, paddingTop: 8, minHeight: 72 },
+    bottomNav: { flexDirection: 'row', borderTopWidth: 1, borderColor: t.border, backgroundColor: t.card, paddingBottom: 8, paddingTop: 8, minHeight: 68 },
     navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 7, borderRadius: 13, marginHorizontal: 3 },
     navActive: { backgroundColor: t.bg, borderTopWidth: 0, marginTop: 0, paddingTop: 7 },
     navGlyph: { fontSize: 20, color: t.muted, ...f },
