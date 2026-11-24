@@ -47,6 +47,26 @@ const jalaliToGregorian = value => {
   while (gm <= 12 && gd > monthDays[gm]) { gd -= monthDays[gm]; gm++; }
   return String(gy).padStart(4,'0') + '-' + String(gm).padStart(2,'0') + '-' + String(gd).padStart(2,'0');
 };
+
+function decodeBase64ToArrayBuffer(base64) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const clean = String(base64 || '').replace(/^data:[^,]+,/, '').replace(/[^A-Za-z0-9+/=]/g, '');
+  const output = new Uint8Array(Math.floor(clean.length * 3 / 4) - (clean.endsWith('==') ? 2 : clean.endsWith('=') ? 1 : 0));
+  let buffer = 0, bits = 0, index = 0;
+  for (const char of clean) {
+    if (char === '=') break;
+    const value = alphabet.indexOf(char);
+    if (value < 0) continue;
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      output[index++] = (buffer >> bits) & 255;
+    }
+  }
+  return output.buffer;
+}
+
 const palettes = {
   سبز: { bg: '#eaf6f4', card: '#ffffff', primary: '#078577', text: '#142b35', muted: '#70838a', border: '#c9dfdc' },
   آبی: { bg: '#f2f5fa', card: '#ffffff', primary: '#315f9b', text: '#1d2c40', muted: '#718096', border: '#dce5f0' },
@@ -253,9 +273,14 @@ function AppContent() {
     const permission = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) return Alert.alert('دسترسی لازم است', 'برای انتخاب تصویر فاکتور اجازه دسترسی بدهید.');
     const result = camera
-      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.65 })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.65 });
-    if (!result.canceled) setInvoice(result.assets[0]);
+      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.75, base64: true })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.75, base64: true });
+    if (!result.canceled && result.assets?.[0]) {
+      const asset = result.assets[0];
+      if (!asset.base64) return Alert.alert('خطای تصویر', 'خواندن اطلاعات تصویر از گوشی انجام نشد. لطفاً تصویر دیگری انتخاب کنید.');
+      if (asset.fileSize && asset.fileSize > 10 * 1024 * 1024) return Alert.alert('حجم زیاد تصویر', 'حجم تصویر باید کمتر از ۱۰ مگابایت باشد.');
+      setInvoice(asset);
+    }
   }
 
   async function saveExpense() {
@@ -264,16 +289,23 @@ function AppContent() {
     setBusy(true);
     try {
       let invoicePath = editing?.invoice_path || null;
+      let newlyUploadedPath = null;
       if (invoice) {
-        const extension = (invoice.fileName || invoice.uri.split('.').pop() || 'jpg').split('.').pop().toLowerCase();
-        const path = session.user.id + '/' + Date.now() + '.' + (['jpg','jpeg','png','webp','heic','heif'].includes(extension) ? extension : 'jpg');
-        const response = await fetch(invoice.uri);
-        if (!response.ok) throw new Error('خواندن تصویر فاکتور ناموفق بود.');
-        const arrayBuffer = await response.arrayBuffer();
-        const mime = invoice.mimeType || (extension === 'png' ? 'image/png' : 'image/jpeg');
-        const upload = await supabase.storage.from('invoices').upload(path, arrayBuffer, { contentType: mime, upsert: false });
-        if (upload.error) throw upload.error;
+        if (!invoice.base64) throw new Error('اطلاعات تصویر در دسترس نیست؛ دوباره عکس را انتخاب کنید.');
+        const mime = String(invoice.mimeType || 'image/jpeg').toLowerCase();
+        const allowed = ['image/jpeg','image/png','image/webp','image/heic','image/heif'];
+        if (!allowed.includes(mime)) throw new Error('فرمت تصویر پشتیبانی نمی‌شود. JPG، PNG، WEBP و HEIC قابل قبول هستند.');
+        const extension = ({ 'image/jpeg':'jpg', 'image/png':'png', 'image/webp':'webp', 'image/heic':'heic', 'image/heif':'heif' })[mime];
+        const path = session.user.id + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + extension;
+        const arrayBuffer = decodeBase64ToArrayBuffer(invoice.base64);
+        if (!arrayBuffer || arrayBuffer.byteLength === 0) throw new Error('محتوای تصویر خالی است؛ لطفاً دوباره انتخاب کنید.');
+        if (arrayBuffer.byteLength > 10 * 1024 * 1024) throw new Error('حجم تصویر بیشتر از ۱۰ مگابایت است.');
+        const upload = await supabase.storage.from('invoices').upload(path, arrayBuffer, {
+          contentType: mime, upsert: false, cacheControl: '3600'
+        });
+        if (upload.error) throw new Error('ذخیره تصویر در فضای ابری ناموفق بود: ' + upload.error.message);
         invoicePath = path;
+        newlyUploadedPath = path;
       }
       const payload = {
         title: title.trim(), amount: numericAmount,
@@ -284,7 +316,13 @@ function AppContent() {
       const result = editing
         ? await supabase.from('expenses').update(payload).eq('id', editing.id)
         : await supabase.from('expenses').insert(payload);
-      if (result.error) throw result.error;
+      if (result.error) {
+        if (newlyUploadedPath) await supabase.storage.from('invoices').remove([newlyUploadedPath]);
+        throw result.error;
+      }
+      if (editing?.invoice_path && newlyUploadedPath && editing.invoice_path !== newlyUploadedPath) {
+        await supabase.storage.from('invoices').remove([editing.invoice_path]);
+      }
       resetForm();
       await loadData();
       Alert.alert('ثبت شد', 'هزینه با موفقیت ذخیره شد.');
