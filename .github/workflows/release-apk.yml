@@ -38,10 +38,13 @@ jobs:
         working-directory: android
         run: chmod +x gradlew && ./gradlew assembleRelease
 
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk H-zineh.apk
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', github.run_number) }}
           name: H-zineh ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', github.run_number) }}
           make_latest: true
-          files: android/app/build/outputs/apk/release/app-release.apk
+          files: H-zineh.apk
