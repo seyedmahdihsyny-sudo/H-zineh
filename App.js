@@ -337,8 +337,11 @@ function AppContent() {
       const payload = {
         title: title.trim(), amount: numericAmount,
         expense_date: editing ? editing.expense_date : today(),
-        category_id: categoryId || null, partner_id: session.user.id,
-        created_by: session.user.id, description: description.trim(), invoice_path: invoicePath
+        category_id: categoryId || null,
+        // When an admin edits another user's expense, preserve its original owner.
+        partner_id: editing ? editing.partner_id : session.user.id,
+        created_by: editing ? editing.created_by : session.user.id,
+        description: description.trim(), invoice_path: invoicePath
       };
       const result = editing
         ? await supabase.from('expenses').update(payload).eq('id', editing.id)
@@ -550,7 +553,7 @@ function AppContent() {
       <Txt style={s.muted}>ثبت‌کننده: {owner?.username || (own ? profile?.username : null) || 'نامشخص'}</Txt>
       {!!item.description && <Txt style={s.description}>{item.description}</Txt>}
       {!!item.invoice_path && <Pressable onPress={() => openInvoicePreview(item)} hitSlop={8}><Txt style={s.link}>فاکتور پیوست شده</Txt></Pressable>}
-      {own && <View style={s.actionRow}>
+      {(own || isAdmin) && <View style={s.actionRow}>
         <Pressable onPress={() => editExpense(item)}><Txt style={s.link}>ویرایش</Txt></Pressable>
         <Pressable onPress={() => deleteExpense(item)}><Txt style={s.danger}>حذف</Txt></Pressable>
       </View>}
