@@ -452,7 +452,7 @@ function AppContent() {
 
   async function saveReleaseInfo() {
     const version = releaseVersionEdit.trim();
-    if (!/^\\d+\\.\\d+\\.\\d+$/.test(version)) {
+    if (!/^\d+\.\d+\.\d+$/.test(version)) {
       return Alert.alert('نسخه نامعتبر', 'شماره نسخه را با قالب 1.0.1 وارد کنید.');
     }
     setBusy(true);
