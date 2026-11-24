@@ -8,6 +8,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { createClient } from '@supabase/supabase-js';
@@ -273,12 +274,37 @@ function AppContent() {
     const permission = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) return Alert.alert('دسترسی لازم است', 'برای انتخاب تصویر فاکتور اجازه دسترسی بدهید.');
     const result = camera
-      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.75, base64: true })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.75, base64: true });
+      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
     if (!result.canceled && result.assets?.[0]) {
-      const asset = result.assets[0];
-      if (!asset.base64) return Alert.alert('خطای تصویر', 'خواندن اطلاعات تصویر از گوشی انجام نشد. لطفاً تصویر دیگری انتخاب کنید.');
-      setInvoice(asset);
+      try {
+        const asset = result.assets[0];
+        const width = Number(asset.width || 0);
+        const height = Number(asset.height || 0);
+        const longestSide = Math.max(width, height);
+        const actions = longestSide > 2000
+          ? [{ resize: width >= height ? { width: 2000 } : { height: 2000 } }]
+          : [];
+        const compressed = await ImageManipulator.manipulateAsync(
+          asset.uri,
+          actions,
+          { compress: 0.78, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        );
+        if (!compressed.base64) throw new Error('خروجی فشرده‌شده ساخته نشد.');
+        setInvoice({
+          ...asset,
+          uri: compressed.uri,
+          width: compressed.width,
+          height: compressed.height,
+          base64: compressed.base64,
+          mimeType: 'image/jpeg',
+          fileName: 'invoice.jpg'
+        });
+        const approxKB = Math.round(compressed.base64.length * 0.75 / 1024);
+        Alert.alert('عکس آماده شد', 'عکس فاکتور فشرده شد. حجم تقریبی: ' + approxKB + ' کیلوبایت');
+      } catch (error) {
+        Alert.alert('فشرده‌سازی ناموفق', error?.message || 'آماده‌سازی عکس انجام نشد. لطفاً عکس دیگری انتخاب کنید.');
+      }
     }
   }
 
@@ -291,10 +317,9 @@ function AppContent() {
       let newlyUploadedPath = null;
       if (invoice) {
         if (!invoice.base64) throw new Error('اطلاعات تصویر در دسترس نیست؛ دوباره عکس را انتخاب کنید.');
-        const mime = String(invoice.mimeType || 'image/jpeg').toLowerCase();
-        const allowed = ['image/jpeg','image/png','image/webp','image/heic','image/heif'];
-        if (!allowed.includes(mime)) throw new Error('فرمت تصویر پشتیبانی نمی‌شود. JPG، PNG، WEBP و HEIC قابل قبول هستند.');
-        const extension = ({ 'image/jpeg':'jpg', 'image/png':'png', 'image/webp':'webp', 'image/heic':'heic', 'image/heif':'heif' })[mime];
+        // Invoice images are converted to compressed JPEG on the device before upload.
+        const mime = 'image/jpeg';
+        const extension = 'jpg';
         const path = session.user.id + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + extension;
         const arrayBuffer = decodeBase64ToArrayBuffer(invoice.base64);
         if (!arrayBuffer || arrayBuffer.byteLength === 0) throw new Error('محتوای تصویر خالی است؛ لطفاً دوباره انتخاب کنید.');
