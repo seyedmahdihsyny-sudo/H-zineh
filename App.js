@@ -6,7 +6,7 @@ import {
   Text, TextInput, View, Modal
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import HZinehLogo from './assets/hzineh-logo.png';
+import HZinehLogo from './assets/hzineh-logo.jpg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
