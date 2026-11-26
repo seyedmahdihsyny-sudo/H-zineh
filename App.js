@@ -1,7 +1,7 @@
 import 'react-native-url-polyfill/auto';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Linking,
+  ActivityIndicator, Alert, Animated, Easing, FlatList, Image, KeyboardAvoidingView, Linking,
   Platform, Pressable, ScrollView, Share, StatusBar, StyleSheet,
   Text, TextInput, View, Modal
 } from 'react-native';
@@ -146,6 +146,7 @@ export default function App() { return <SafeAreaProvider><AppContent /></SafeAre
 function AppContent() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const gearRotation = useRef(new Animated.Value(0)).current;
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [profile, setProfile] = useState(null);
@@ -200,22 +201,45 @@ function AppContent() {
 
   useEffect(() => {
     (async () => {
-      const saved = await AsyncStorage.multiGet(['hz_theme', 'hz_font', 'hz_font_scale']);
-      if (saved[0][1] && palettes[saved[0][1]]) setThemeName(saved[0][1]);
-      if (saved[1][1]) setFontName(saved[1][1]);
-      if (saved[2][1]) setFontScale(Number(saved[2][1]) || 1);
-      const { data } = await supabase.auth.getSession();
-      setSession(data.session);
-      setLoading(false);
+      try {
+        const saved = await AsyncStorage.multiGet(['hz_theme', 'hz_font', 'hz_font_scale']);
+        if (saved[0][1] && palettes[saved[0][1]]) setThemeName(saved[0][1]);
+        if (saved[1][1]) setFontName(saved[1][1]);
+        if (saved[2][1]) setFontScale(Number(saved[2][1]) || 1);
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        setSession(data.session);
+        if (!data.session) setLoading(false);
+      } catch (error) {
+        console.warn('App startup failed:', error?.message || error);
+        setLoading(false);
+      }
     })();
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
     return () => listener.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (session?.user?.id) loadData();
-    else { setProfile(null); setExpenses([]); }
+    let active = true;
+    if (session?.user?.id) {
+      setLoading(true);
+      (async () => {
+        try { await loadData(); }
+        finally { if (active) setLoading(false); }
+      })();
+    } else {
+      setProfile(null);
+      setExpenses([]);
+      setLoading(false);
+    }
+    return () => { active = false; };
   }, [session?.user?.id]);
+
+  useEffect(() => {
+    const animation = Animated.loop(Animated.timing(gearRotation, { toValue: 1, duration: 2600, easing: Easing.linear, useNativeDriver: true }));
+    animation.start();
+    return () => animation.stop();
+  }, [gearRotation]);
 
   useEffect(() => {
     if (!session?.user?.id || Platform.OS !== 'android') return;
@@ -639,7 +663,25 @@ function AppContent() {
     </View>;
   }
 
-  if (loading) return <View style={s.center}><ActivityIndicator size="large" color={theme.primary} /></View>;
+  if (loading) return (
+    <View style={styles.bootScreen}>
+      <StatusBar barStyle="light-content" backgroundColor="#090909" />
+      <View style={styles.bootLogoFrame}>
+        <View style={styles.bootEmblem}>
+          <Txt style={styles.bootH}>H</Txt>
+          <View style={styles.bootGoldSweep} />
+          <Txt style={styles.bootFactory}>▥</Txt>
+        </View>
+        <Txt style={styles.bootBrand}><Text style={styles.bootBrandGold}>H</Text>-zineh</Txt>
+      </View>
+      <Txt style={styles.bootTagline}>مدیریت صورت‌حساب‌ها، خرج و مخارج با H</Txt>
+      <View style={styles.bootLoaderWrap}>
+        <Animated.Text style={[styles.bootGear, { transform: [{ rotate: gearRotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }]}>⚙</Animated.Text>
+        <View style={styles.bootLoaderTrack}><View style={styles.bootLoaderFill} /></View>
+        <Txt style={styles.bootLoadingText}>در حال آماده‌سازی برنامه…</Txt>
+      </View>
+    </View>
+  );
   if (!session) return (
     <SafeAreaView style={s.screen} edges={['top','right','bottom','left']}>
       <StatusBar barStyle={themeName === 'تیره' || themeName === 'ذغالی' ? 'light-content' : 'dark-content'} />
@@ -887,6 +929,24 @@ function AppContent() {
     </SafeAreaView>
   );
 }
+
+
+const styles = StyleSheet.create({
+  bootScreen: { flex: 1, backgroundColor: '#090909', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 26 },
+  bootLogoFrame: { width: 260, height: 260, borderRadius: 130, borderWidth: 2, borderColor: '#C99A36', alignItems: 'center', justifyContent: 'center', shadowColor: '#D6A640', shadowOpacity: 0.35, shadowRadius: 22, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
+  bootEmblem: { width: 176, height: 130, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  bootH: { color: '#E7E7E7', fontSize: 116, fontWeight: '900', lineHeight: 126, textShadowColor: '#B88A2E', textShadowRadius: 12 },
+  bootGoldSweep: { position: 'absolute', width: 180, height: 12, borderRadius: 12, backgroundColor: '#D9A83D', transform: [{ rotate: '-17deg' }], top: 65, shadowColor: '#F6C65B', shadowOpacity: 0.8, shadowRadius: 8 },
+  bootFactory: { position: 'absolute', right: 0, bottom: 0, color: '#D5D5D5', fontSize: 36, fontWeight: '900' },
+  bootBrand: { marginTop: 8, color: '#EDEDED', fontSize: 38, fontWeight: '900', letterSpacing: 0.5 },
+  bootBrandGold: { color: '#D6A33C' },
+  bootTagline: { marginTop: 28, color: '#E7D3A6', fontSize: 16, fontWeight: '700', textAlign: 'center', lineHeight: 30 },
+  bootLoaderWrap: { alignItems: 'center', marginTop: 48 },
+  bootGear: { color: '#D6A33C', fontSize: 52, lineHeight: 64, textShadowColor: '#D6A33C', textShadowRadius: 12 },
+  bootLoaderTrack: { width: 150, height: 3, borderRadius: 4, backgroundColor: '#40331B', overflow: 'hidden', marginTop: 10 },
+  bootLoaderFill: { width: '45%', height: 3, borderRadius: 4, backgroundColor: '#E2B64E' },
+  bootLoadingText: { color: '#AFA48D', fontSize: 12, marginTop: 14 }
+});
 
 function makeStyles(t, fontFamily, fontScale) {
   const f = fontFamily ? { fontFamily } : {};
