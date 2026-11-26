@@ -8,9 +8,8 @@
     "newArchEnabled": true,
     "icon": "./assets/hzineh-logo.png",
     "splash": {
-      "image": "./assets/hzineh-logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#101827"
+      "backgroundColor": "#090909"
     },
     "android": {
       "package": "com.hzineh.expenses",
@@ -26,6 +25,13 @@
       }
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#090909",
+          "resizeMode": "contain"
+        }
+      ],
       [
         "expo-image-picker",
         {
