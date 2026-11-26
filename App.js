@@ -6,6 +6,7 @@ import {
   Text, TextInput, View, Modal
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import HZinehLogo from './assets/hzineh-logo.png';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -666,14 +667,7 @@ function AppContent() {
   if (loading) return (
     <View style={styles.bootScreen}>
       <StatusBar barStyle="light-content" backgroundColor="#090909" />
-      <View style={styles.bootLogoFrame}>
-        <View style={styles.bootEmblem}>
-          <Txt style={styles.bootH}>H</Txt>
-          <View style={styles.bootGoldSweep} />
-          <Txt style={styles.bootFactory}>▥</Txt>
-        </View>
-        <Txt style={styles.bootBrand}><Text style={styles.bootBrandGold}>H</Text>-zineh</Txt>
-      </View>
+      <Image source={HZinehLogo} style={styles.bootLogoImage} resizeMode="contain" />
       <Txt style={styles.bootTagline}>مدیریت صورت‌حساب‌ها، خرج و مخارج با H</Txt>
       <View style={styles.bootLoaderWrap}>
         <Animated.Text style={[styles.bootGear, { transform: [{ rotate: gearRotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }]}>⚙</Animated.Text>
@@ -933,13 +927,7 @@ function AppContent() {
 
 const styles = StyleSheet.create({
   bootScreen: { flex: 1, backgroundColor: '#090909', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 26 },
-  bootLogoFrame: { width: 260, height: 260, borderRadius: 130, borderWidth: 2, borderColor: '#C99A36', alignItems: 'center', justifyContent: 'center', shadowColor: '#D6A640', shadowOpacity: 0.35, shadowRadius: 22, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
-  bootEmblem: { width: 176, height: 130, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  bootH: { color: '#E7E7E7', fontSize: 116, fontWeight: '900', lineHeight: 126, textShadowColor: '#B88A2E', textShadowRadius: 12 },
-  bootGoldSweep: { position: 'absolute', width: 180, height: 12, borderRadius: 12, backgroundColor: '#D9A83D', transform: [{ rotate: '-17deg' }], top: 65, shadowColor: '#F6C65B', shadowOpacity: 0.8, shadowRadius: 8 },
-  bootFactory: { position: 'absolute', right: 0, bottom: 0, color: '#D5D5D5', fontSize: 36, fontWeight: '900' },
-  bootBrand: { marginTop: 8, color: '#EDEDED', fontSize: 38, fontWeight: '900', letterSpacing: 0.5 },
-  bootBrandGold: { color: '#D6A33C' },
+  bootLogoImage: { width: 310, height: 310, maxWidth: '88%', shadowColor: '#D6A640', shadowOpacity: 0.3, shadowRadius: 20, elevation: 10 },
   bootTagline: { marginTop: 28, color: '#E7D3A6', fontSize: 16, fontWeight: '700', textAlign: 'center', lineHeight: 30 },
   bootLoaderWrap: { alignItems: 'center', marginTop: 48 },
   bootGear: { color: '#D6A33C', fontSize: 52, lineHeight: 64, textShadowColor: '#D6A33C', textShadowRadius: 12 },
