@@ -22,6 +22,12 @@ const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable
 const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false }
 });
+const compareVersions = (a, b) => {
+  const aa = String(a || '0').split('.').map(Number);
+  const bb = String(b || '0').split('.').map(Number);
+  for (let i = 0; i < 3; i++) { const diff = (aa[i] || 0) - (bb[i] || 0); if (diff) return diff; }
+  return 0;
+};
 const money = value => new Intl.NumberFormat('fa-IR').format(Number(value || 0)) + ' تومان';
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const dateText = value => value ? new Date(value + 'T12:00:00+03:30').toLocaleDateString('fa-IR-u-ca-persian', { timeZone: 'Asia/Tehran', calendar: 'persian', numberingSystem: 'arabext' }) : '—';
@@ -198,7 +204,7 @@ function AppContent() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [releaseNotes, setReleaseNotes] = useState('');
   const [releaseNotesEdit, setReleaseNotesEdit] = useState('');
-  const currentAppVersion = '1.0.0';
+  const currentAppVersion = '1.0.1';
   const apkDownloadUrl = 'https://github.com/seyedmahdihsyny-sudo/H-zineh/releases/latest/download/H-zineh.apk';
 
   const theme = palettes[themeName] || palettes.سبز;
@@ -302,7 +308,7 @@ function AppContent() {
       const notes = (sr.data || []).find(x => x.key === 'release_notes')?.value || '';
       setReleaseVersion(version); setReleaseVersionEdit(version);
       setReleaseNotes(notes); setReleaseNotesEdit(notes);
-      setUpdateAvailable(!!version && version !== currentAppVersion);
+      setUpdateAvailable(!!version && compareVersions(version, currentAppVersion) > 0);
     }
   }
 
@@ -535,12 +541,30 @@ function AppContent() {
     setBusy(false);
     if (result.error) return Alert.alert('خطا', result.error.message);
     setReleaseVersion(version); setReleaseNotes(releaseNotesEdit.trim());
-    setUpdateAvailable(version !== currentAppVersion);
+    setUpdateAvailable(compareVersions(version, currentAppVersion) > 0);
     const push = await supabase.functions.invoke('send-push', {
       body: { type: 'app_update', version, notes: releaseNotesEdit.trim() }
     });
     if (push.error) console.warn('Update push notification failed:', push.error.message);
     Alert.alert('ذخیره شد', 'اطلاعات نسخه جدید برای کاربران ثبت شد.');
+  }
+
+  async function clearReleaseAnnouncement() {
+    Alert.alert('حذف اعلان برای همه کاربران', 'اعلان به‌روزرسانی از داخل برنامه همه کاربران پاک شود؟', [
+      { text: 'انصراف', style: 'cancel' },
+      { text: 'حذف اعلان', style: 'destructive', onPress: async () => {
+        setBusy(true);
+        const result = await supabase.from('app_settings').upsert([
+          { key: 'release_version', value: currentAppVersion, updated_by: session.user.id },
+          { key: 'release_notes', value: '', updated_by: session.user.id }
+        ], { onConflict: 'key' });
+        setBusy(false);
+        if (result.error) return Alert.alert('خطا', result.error.message);
+        setReleaseVersion(currentAppVersion); setReleaseVersionEdit(currentAppVersion);
+        setReleaseNotes(''); setReleaseNotesEdit(''); setUpdateAvailable(false);
+        Alert.alert('انجام شد', 'اعلان به‌روزرسانی برای همه کاربران حذف شد.');
+      }}
+    ]);
   }
 
   async function downloadLatestApk() {
@@ -842,6 +866,7 @@ function AppContent() {
               <TextInput style={[s.input,s.multiline]} value={releaseNotesEdit} onChangeText={setReleaseNotesEdit} placeholder="توضیحات نسخه (اختیاری)" placeholderTextColor={theme.muted} multiline />
               <Pressable style={s.primary} onPress={saveReleaseInfo} disabled={busy}><Txt style={s.primaryText}>{busy ? 'در حال ذخیره…' : 'اعلان نسخه جدید به کاربران'}</Txt></Pressable>
               <Pressable style={s.secondary} onPress={downloadLatestApk}><Txt style={s.secondaryText}>آزمایش لینک دانلود مستقیم</Txt></Pressable>
+              <Pressable style={s.dangerButton} onPress={clearReleaseAnnouncement} disabled={busy}><Txt style={s.dangerText}>{busy ? 'در حال حذف…' : 'حذف اعلان به‌روزرسانی برای همه کاربران'}</Txt></Pressable>
             </View>
             <Pressable style={s.settingsRow} onPress={() => openAdminPage('users')}><View style={s.settingsRowText}><Txt style={s.cardTitle}>کاربران و دسته‌بندی‌ها</Txt><Txt style={s.muted}>ساخت و مشاهده کاربران و مدیریت دسته‌ها</Txt></View><Txt style={s.settingsArrow}>‹</Txt></Pressable>
             <Pressable style={s.settingsRow} onPress={() => openAdminPage('deleted')}><View style={s.settingsRowText}><Txt style={s.cardTitle}>سوابق حذف و تغییرات</Txt><Txt style={s.muted}>مشاهده تاریخچه عملیات هزینه‌ها</Txt></View><Txt style={s.settingsArrow}>‹</Txt></Pressable>
