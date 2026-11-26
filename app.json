@@ -6,6 +6,12 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "icon": "./assets/hzineh-logo.png",
+    "splash": {
+      "image": "./assets/hzineh-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#101827"
+    },
     "android": {
       "package": "com.hzineh.expenses",
       "versionCode": 1,
@@ -16,7 +22,7 @@
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/hzineh-logo.png",
-        "backgroundColor": "#090909"
+        "backgroundColor": "#101827"
       }
     },
     "plugins": [
@@ -34,7 +40,6 @@
           "defaultChannel": "general"
         }
       ]
-    ],
-    "icon": "./assets/hzineh-logo.png"
+    ]
   }
 }
