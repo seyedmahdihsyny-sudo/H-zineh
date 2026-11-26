@@ -149,7 +149,7 @@ function AppContent() {
   const [loading, setLoading] = useState(true);
   const bootStartedAt = useRef(Date.now());
   const finishBootLoading = async () => {
-    const remaining = 1800 - (Date.now() - bootStartedAt.current);
+    const remaining = 10000 - (Date.now() - bootStartedAt.current);
     if (remaining > 0) await new Promise(resolve => setTimeout(resolve, remaining));
     setLoading(false);
   };
