@@ -147,6 +147,12 @@ export default function App() { return <SafeAreaProvider><AppContent /></SafeAre
 function AppContent() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const bootStartedAt = useRef(Date.now());
+  const finishBootLoading = async () => {
+    const remaining = 1800 - (Date.now() - bootStartedAt.current);
+    if (remaining > 0) await new Promise(resolve => setTimeout(resolve, remaining));
+    setLoading(false);
+  };
   const gearRotation = useRef(new Animated.Value(0)).current;
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -210,10 +216,10 @@ function AppContent() {
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
         setSession(data.session);
-        if (!data.session) setLoading(false);
+        if (!data.session) await finishBootLoading();
       } catch (error) {
         console.warn('App startup failed:', error?.message || error);
-        setLoading(false);
+        await finishBootLoading();
       }
     })();
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
@@ -226,12 +232,12 @@ function AppContent() {
       setLoading(true);
       (async () => {
         try { await loadData(); }
-        finally { if (active) setLoading(false); }
+        finally { if (active) await finishBootLoading(); }
       })();
     } else {
       setProfile(null);
       setExpenses([]);
-      setLoading(false);
+      finishBootLoading();
     }
     return () => { active = false; };
   }, [session?.user?.id]);
