@@ -38,7 +38,7 @@ jobs:
         run: npm install
 
       - name: Install Expo-compatible native dependencies
-        run: npx expo install react-native-safe-area-context expo-notifications
+        run: npx expo install react-native-safe-area-context expo-notifications expo-splash-screen
 
       - name: Generate native Android project
         run: npx expo prebuild --platform android --non-interactive
