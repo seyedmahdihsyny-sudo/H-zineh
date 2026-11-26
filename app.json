@@ -9,13 +9,20 @@
     "android": {
       "package": "com.hzineh.expenses",
       "versionCode": 1,
-      "permissions": ["CAMERA", "READ_MEDIA_IMAGES"]
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "plugins": [
-      ["expo-image-picker", {
-        "photosPermission": "برای پیوست تصویر فاکتور به هزینه، دسترسی به تصاویر لازم است.",
-        "cameraPermission": "برای ثبت تصویر فاکتور، دسترسی به دوربین لازم است."
-      }]
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "برای پیوست تصویر فاکتور به هزینه، دسترسی به تصاویر لازم است.",
+          "cameraPermission": "برای ثبت تصویر فاکتور، دسترسی به دوربین لازم است."
+        }
+      ]
     ]
   }
 }
