@@ -22,6 +22,14 @@
           "photosPermission": "برای پیوست تصویر فاکتور به هزینه، دسترسی به تصاویر لازم است.",
           "cameraPermission": "برای ثبت تصویر فاکتور، دسترسی به دوربین لازم است."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#078577",
+          "defaultChannel": "general"
+        }
       ]
     ]
   }
