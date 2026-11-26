@@ -11,7 +11,10 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as Notifications from 'expo-notifications';
 import { createClient } from '@supabase/supabase-js';
+
+Notifications.setNotificationHandler({ handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false }) });
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://mentihhsaenssxgktvmi.supabase.co';
 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_CGDA-fYA_OLWoUfkBcIJwQ_AZqNUlkB';
@@ -214,6 +217,37 @@ function AppContent() {
     else { setProfile(null); setExpenses([]); }
   }, [session?.user?.id]);
 
+  useEffect(() => {
+    if (!session?.user?.id || Platform.OS !== 'android') return;
+    let active = true;
+    const saveDeviceToken = async tokenValue => {
+      if (!active || !tokenValue) return;
+      const token = typeof tokenValue === 'string' ? tokenValue : String(tokenValue);
+      const { error } = await supabase.from('push_tokens').upsert({
+        user_id: session.user.id, token, platform: Platform.OS, updated_at: new Date().toISOString()
+      }, { onConflict: 'token' });
+      if (error) console.warn('Push token registration failed:', error.message);
+    };
+    (async () => {
+      try {
+        await Notifications.setNotificationChannelAsync('general', {
+          name: 'اعلان‌های H-zineh',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250]
+        });
+        let permission = await Notifications.getPermissionsAsync();
+        if (permission.status !== 'granted') permission = await Notifications.requestPermissionsAsync();
+        if (!active || permission.status !== 'granted') return;
+        const deviceToken = await Notifications.getDevicePushTokenAsync();
+        await saveDeviceToken(deviceToken.data);
+      } catch (error) {
+        console.warn('Push notification setup failed:', error?.message || error);
+      }
+    })();
+    const tokenListener = Notifications.addPushTokenListener(token => saveDeviceToken(token.data));
+    return () => { active = false; tokenListener.remove(); };
+  }, [session?.user?.id]);
+
   async function loadData() {
     const [er, cr, pr, prs, sr] = await Promise.all([
       supabase.from('expenses').select('*, expense_categories(name)').order('expense_date', { ascending: false }).order('created_at', { ascending: false }),
@@ -357,13 +391,19 @@ function AppContent() {
       };
       const result = editing
         ? await supabase.from('expenses').update(payload).eq('id', editing.id)
-        : await supabase.from('expenses').insert(payload);
+        : await supabase.from('expenses').insert(payload).select('id').single();
       if (result.error) {
         if (newlyUploadedPath) await supabase.storage.from('invoices').remove([newlyUploadedPath]);
         throw result.error;
       }
       if (editing?.invoice_path && newlyUploadedPath && editing.invoice_path !== newlyUploadedPath) {
         await supabase.storage.from('invoices').remove([editing.invoice_path]);
+      }
+      if (!editing && result.data?.id) {
+        const push = await supabase.functions.invoke('send-push', {
+          body: { type: 'expense_created', expense_id: result.data.id }
+        });
+        if (push.error) console.warn('Expense push notification failed:', push.error.message);
       }
       resetForm();
       await loadData();
@@ -465,6 +505,10 @@ function AppContent() {
     if (result.error) return Alert.alert('خطا', result.error.message);
     setReleaseVersion(version); setReleaseNotes(releaseNotesEdit.trim());
     setUpdateAvailable(version !== currentAppVersion);
+    const push = await supabase.functions.invoke('send-push', {
+      body: { type: 'app_update', version, notes: releaseNotesEdit.trim() }
+    });
+    if (push.error) console.warn('Update push notification failed:', push.error.message);
     Alert.alert('ذخیره شد', 'اطلاعات نسخه جدید برای کاربران ثبت شد.');
   }
 
