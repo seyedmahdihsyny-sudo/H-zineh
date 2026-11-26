@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "800734795016",
+    "project_id": "h-zineh-b0de8",
+    "storage_bucket": "h-zineh-b0de8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:800734795016:android:5e3c74d99b56a4725588bd",
+        "android_client_info": {
+          "package_name": "com.hzineh.expenses"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB45VB2j1nlB1yaN5TGBWLGAdc9nk1y_Qo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
