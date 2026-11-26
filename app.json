@@ -13,7 +13,11 @@
         "CAMERA",
         "READ_MEDIA_IMAGES"
       ],
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/hzineh-logo.png",
+        "backgroundColor": "#090909"
+      }
     },
     "plugins": [
       [
@@ -30,6 +34,7 @@
           "defaultChannel": "general"
         }
       ]
-    ]
+    ],
+    "icon": "./assets/hzineh-logo.png"
   }
 }
