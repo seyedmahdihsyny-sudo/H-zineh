@@ -15,7 +15,7 @@
       ],
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/hzineh-logo.png",
+        "foregroundImage": "./assets/hzineh-logo.jpg",
         "backgroundColor": "#090909"
       }
     },
@@ -35,6 +35,6 @@
         }
       ]
     ],
-    "icon": "./assets/hzineh-logo.png"
+    "icon": "./assets/hzineh-logo.jpg"
   }
 }
